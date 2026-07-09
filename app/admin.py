@@ -1177,7 +1177,7 @@ def importar_parana_atual():
             errors.append(str(exc))
             flash(f'Não foi possível concluir a importação: {exc}', 'danger')
 
-    stats = {
+    import_stats = {
         'imported_total': db.session.query(func.count(Post.id)).filter(Post.source == 'parana_atual_import').scalar() or 0,
         'with_local_images': db.session.query(func.count(Post.id)).filter(Post.source == 'parana_atual_import', Post.featured_image.like('/media/%')).scalar() or 0,
     }
@@ -1188,7 +1188,7 @@ def importar_parana_atual():
         preview_items=preview_items,
         imported_items=imported_items,
         errors=errors,
-        stats=stats,
+        import_stats=import_stats,
         **_common_admin_context('import_parana_atual'),
     )
 
