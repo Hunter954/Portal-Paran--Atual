@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+{% set hero = lead_post %}
+{% set hero_cards = latest_queue[:3] %}
+
+<section class="pa-home-grid">
+  <div class="pa-home-left">
+    {% if hero %}
+    <a class="pa-hero-card" href="{{ url_for('site.post', slug=hero.slug) }}">
+      <div class="pa-hero-img" style="background-image:url('{{ hero.featured_image or '' }}')"></div>
+      <div class="pa-hero-overlay">
+        <h1>{{ clean_text(hero.title, 92) }}</h1>
+        <p>{{ clean_text(hero.excerpt or hero.content_html, 150) }}</p>
+      </div>
+    </a>
+    {% endif %}
+
+    <div class="pa-card-row pa-card-row--top">
+      {% for p in hero_cards %}
+      <a class="pa-news-card" href="{{ url_for('site.post', slug=p.slug) }}">
+        <div class="pa-news-card__img" style="background-image:url('{{ p.featured_image or '' }}')"></div>
+        <h3>{{ clean_text(p.title, 72) }}</h3>
+        <p>{{ clean_text(p.excerpt or p.content_html, 120) }}</p>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <aside class="pa-home-sidebar">
+    <div class="pa-ad pa-ad--green">{% if ad_sidebar_1 %}{{ ad_sidebar_1|safe }}{% endif %}</div>
+    <div class="pa-ad pa-ad--blue">{% if ad_header %}{{ ad_header|safe }}{% endif %}</div>
+    <div class="pa-ad pa-ad--green pa-ad--tall">{% if ad_sidebar_2 %}{{ ad_sidebar_2|safe }}{% endif %}</div>
+  </aside>
+</section>
+
+{% for section in category_sections[:6] %}
+  {% set posts = section.posts[:3] %}
+  {% if posts %}
+  <section class="pa-section-block">
+    <div class="pa-section-head">
+      <h2>{{ section.category.name|upper }}</h2>
+      <a href="{{ url_for('site.category', slug=section.category.slug) }}">ver todas...</a>
+    </div>
+    <div class="pa-card-row">
+      {% for p in posts %}
+      <a class="pa-news-card pa-news-card--section" href="{{ url_for('site.post', slug=p.slug) }}">
+        <div class="pa-news-card__img" style="background-image:url('{{ p.featured_image or '' }}')"></div>
+        <h3>{{ clean_text(p.title, 85) }}</h3>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+{% endfor %}
+{% endblock %}
