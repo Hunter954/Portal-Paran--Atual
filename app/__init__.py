@@ -45,12 +45,18 @@ def _ensure_schema_updates():
     if inspector.has_table("post"):
         post_columns = {col["name"] for col in inspector.get_columns("post")}
         post_statements = []
+        # Instalações antigas não tinham esses campos. Sem eles, a tela
+        # /admin/importar-parana-atual quebra já no GET ao calcular estatísticas.
+        if "source" not in post_columns:
+            post_statements.append("ALTER TABLE post ADD COLUMN source VARCHAR(30) DEFAULT 'local'")
         if "source_url" not in post_columns:
             post_statements.append('ALTER TABLE post ADD COLUMN source_url VARCHAR(1000)')
         if post_statements:
             with db.engine.begin() as conn:
                 for stmt in post_statements:
                     conn.execute(text(stmt))
+                if "source" not in post_columns:
+                    conn.execute(text("UPDATE post SET source = 'local' WHERE source IS NULL"))
 
     if inspector.has_table("guide_listing"):
         guide_columns = {col["name"] for col in inspector.get_columns("guide_listing")}
