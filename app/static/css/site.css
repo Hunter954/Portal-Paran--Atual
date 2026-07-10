@@ -1274,3 +1274,14 @@ img{max-width:100%;display:block}
 @media (prefers-reduced-motion:reduce){
   .pa-hero-img,.pa-news-card__img{transition:none;}
 }
+
+
+/* Correção do zoom-out da manchete: mantém a própria foto ao fundo */
+.pa-hero-card{
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+}
+.pa-hero-img{
+  backface-visibility:hidden;
+}

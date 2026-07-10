@@ -6,7 +6,7 @@
 <section class="pa-home-grid">
   <div class="pa-home-left">
     {% if hero %}
-    <a class="pa-hero-card" href="{{ url_for('site.post', slug=hero.slug) }}">
+    <a class="pa-hero-card" href="{{ url_for('site.post', slug=hero.slug) }}" style="background-image:url('{{ hero.featured_image or '' }}')">
       <div class="pa-hero-img" style="background-image:url('{{ hero.featured_image or '' }}')"></div>
       <div class="pa-hero-overlay">
         <h1>{{ clean_text(hero.title, 92) }}</h1>
