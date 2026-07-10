@@ -1250,13 +1250,18 @@ img{max-width:100%;display:block}
 /* Destaques por categoria, crédito e efeito das imagens - julho/2026 */
 .pa-hero-img,
 .pa-news-card__img{
-  transform:scale(1.055);
+  transform:scale(1);
+  transform-origin:center;
   transition:transform .38s ease;
   will-change:transform;
 }
+.pa-hero-card,
+.pa-news-card__img-wrap{
+  overflow:hidden;
+}
 .pa-hero-card:hover .pa-hero-img,
 .pa-news-card:hover .pa-news-card__img{
-  transform:scale(1);
+  transform:scale(.965);
 }
 .pa-footer-green a{
   color:inherit;
