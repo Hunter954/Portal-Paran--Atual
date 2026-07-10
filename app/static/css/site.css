@@ -1245,3 +1245,27 @@ img{max-width:100%;display:block}
   .pa-article-sidebar .pa-ad--blue,
   .pa-article-sidebar .pa-ad--tall{min-height:130px;}
 }
+
+
+/* Destaques por categoria, crédito e efeito das imagens - julho/2026 */
+.pa-hero-img,
+.pa-news-card__img{
+  transform:scale(1.055);
+  transition:transform .38s ease;
+  will-change:transform;
+}
+.pa-hero-card:hover .pa-hero-img,
+.pa-news-card:hover .pa-news-card__img{
+  transform:scale(1);
+}
+.pa-footer-green a{
+  color:inherit;
+  text-decoration:none;
+  margin-left:3px;
+}
+.pa-footer-green a:hover{
+  text-decoration:underline;
+}
+@media (prefers-reduced-motion:reduce){
+  .pa-hero-img,.pa-news-card__img{transition:none;}
+}

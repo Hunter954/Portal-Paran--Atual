@@ -498,27 +498,26 @@ def home():
     selected_cat_slug = (request.args.get("cat") or "").strip() or "cidade"
     selected_cat, selected_posts = cat_posts(selected_cat_slug, 8)
 
-    ordered_categories = Category.query.order_by(Category.name.asc()).all()
-    ordered_categories.sort(key=lambda cat: (_category_priority(cat), (cat.name or '').lower()))
-
+    # Abaixo da manchete exibimos somente a editoria Cidade por enquanto.
+    # A busca considera uma fila maior para ainda encontrar três matérias sem
+    # repetir a manchete nem os três destaques superiores.
     category_sections = []
     home_used_ids = {p.id for p in [lead_post, *latest_queue] if p}
     home_used_keys = {_post_identity(p) for p in [lead_post, *latest_queue] if p}
-    for cat in ordered_categories[:10]:
-        candidates = (_published_posts_query().join(Post.categories)
-                      .filter(Category.id == cat.id)
-                      .order_by(desc(Post.published_at), desc(Post.id))
-                      .limit(24).all())
-        posts = _unique_posts(
-            candidates,
+    city_category = Category.query.filter_by(slug="cidade").first()
+    if city_category:
+        city_candidates = (_published_posts_query().join(Post.categories)
+                           .filter(Category.id == city_category.id)
+                           .order_by(desc(Post.published_at), desc(Post.id))
+                           .limit(100).all())
+        city_posts = _unique_posts(
+            city_candidates,
             limit=3,
             used_ids=home_used_ids,
             used_keys=home_used_keys,
         )
-        if posts:
-            category_sections.append({"category": cat, "posts": posts})
-        if len(category_sections) >= 6:
-            break
+        if city_posts:
+            category_sections.append({"category": city_category, "posts": city_posts})
 
     if (not selected_cat or not selected_posts) and category_sections:
         selected_cat = category_sections[0]["category"]
