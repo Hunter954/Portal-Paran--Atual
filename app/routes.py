@@ -439,7 +439,31 @@ def hub_posts_delete_api():
 def home():
     _track_view(None)
 
-    latest = _published_posts_query().order_by(desc(Post.published_at), desc(Post.id)).limit(24).all()
+    def _post_identity(item):
+        # Evita repetir a mesma matéria na home mesmo quando a importação criou
+        # registros diferentes com o mesmo título.
+        normalized_title = re.sub(r"\s+", " ", unescape(item.title or "")).strip().casefold()
+        return normalized_title or f"id:{item.id}"
+
+    def _unique_posts(items, limit=None, used_ids=None, used_keys=None):
+        used_ids = used_ids if used_ids is not None else set()
+        used_keys = used_keys if used_keys is not None else set()
+        result = []
+        for item in items:
+            key = _post_identity(item)
+            if item.id in used_ids or key in used_keys:
+                continue
+            result.append(item)
+            used_ids.add(item.id)
+            used_keys.add(key)
+            if limit and len(result) >= limit:
+                break
+        return result
+
+    latest_candidates = (_published_posts_query()
+                         .order_by(desc(Post.published_at), desc(Post.id))
+                         .limit(60).all())
+    latest = _unique_posts(latest_candidates, limit=24)
     lead_post = latest[0] if latest else None
     latest_queue = latest[1:4] if len(latest) > 1 else []
     excluded_ids = {p.id for p in [lead_post, *latest_queue] if p}
@@ -478,13 +502,23 @@ def home():
     ordered_categories.sort(key=lambda cat: (_category_priority(cat), (cat.name or '').lower()))
 
     category_sections = []
+    home_used_ids = {p.id for p in [lead_post, *latest_queue] if p}
+    home_used_keys = {_post_identity(p) for p in [lead_post, *latest_queue] if p}
     for cat in ordered_categories[:10]:
-        posts = (_published_posts_query().join(Post.categories)
-                 .filter(Category.id == cat.id)
-                 .order_by(desc(Post.published_at), desc(Post.id))
-                 .limit(6).all())
+        candidates = (_published_posts_query().join(Post.categories)
+                      .filter(Category.id == cat.id)
+                      .order_by(desc(Post.published_at), desc(Post.id))
+                      .limit(24).all())
+        posts = _unique_posts(
+            candidates,
+            limit=3,
+            used_ids=home_used_ids,
+            used_keys=home_used_keys,
+        )
         if posts:
             category_sections.append({"category": cat, "posts": posts})
+        if len(category_sections) >= 6:
+            break
 
     if (not selected_cat or not selected_posts) and category_sections:
         selected_cat = category_sections[0]["category"]

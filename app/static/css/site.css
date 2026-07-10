@@ -1213,3 +1213,35 @@ img{max-width:100%;display:block}
 @media (max-width:720px){
   .pa-utility-bar{height:auto;min-height:28px;padding:5px 0;font-size:7px}.pa-utility-inner{align-items:flex-start}.pa-header-blue{height:auto;padding:14px 0}.pa-header-main{grid-template-columns:1fr auto;grid-template-areas:"logo social" "search search";row-gap:12px}.pa-logo{grid-area:logo;justify-self:start}.pa-socials{grid-area:social;gap:8px}.pa-socials a{width:27px;height:27px;font-size:15px}.pa-search{grid-area:search;max-width:none}.pa-nav-inner{min-height:48px}.pa-article-grid{padding-top:8px}.pa-article-title{font-size:28px}.pa-article-subtitle{font-size:14px}.pa-article-content{font-size:16px;line-height:1.55}.pa-article-sidebar{grid-template-columns:1fr}.pa-footer-content{flex-direction:column;align-items:flex-start;padding-top:30px;padding-bottom:30px}.pa-footer-green{height:auto;min-height:42px;padding:10px 0}
 }
+
+
+/* Ajustes de alinhamento e publicidade - julho/2026 */
+.pa-nav-inner{
+  justify-content:flex-start;
+}
+.pa-socials a{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  line-height:1;
+}
+.pa-socials a i{
+  display:block;
+  line-height:1;
+  margin:0;
+}
+.pa-socials a .bi-facebook,
+.pa-socials a .bi-instagram,
+.pa-socials a .bi-twitter-x,
+.pa-socials a .bi-youtube{
+  transform:translateY(0);
+}
+.pa-article-sidebar .pa-ad--green{min-height:250px;}
+.pa-article-sidebar .pa-ad--blue{min-height:145px;}
+.pa-article-sidebar .pa-ad--tall{min-height:285px;}
+
+@media (max-width:991px){
+  .pa-article-sidebar .pa-ad--green,
+  .pa-article-sidebar .pa-ad--blue,
+  .pa-article-sidebar .pa-ad--tall{min-height:130px;}
+}
