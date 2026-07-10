@@ -21,56 +21,71 @@
   <meta name="twitter:description" content="{{ meta_description or '' }}">
   {% if meta_image %}<meta name="twitter:image" content="{{ meta_image }}">{% endif %}
   {% if google_site_verification %}<meta name="google-site-verification" content="{{ google_site_verification }}">{% endif %}
-  <script type="application/ld+json">
-    {{ {"@context":"https://schema.org","@type":"NewsMediaOrganization","name":organization_schema.name,"url":organization_schema.url,"logo":organization_schema.logo,"email":organization_schema.email,"telephone":organization_schema.telephone,"sameAs":[social_links.instagram, social_links.facebook, social_links.youtube, social_links.x] | select | list} | tojson }}
-  </script>
-  {% if meta_type == 'article' %}
-  <script type="application/ld+json">
-    {{ {"@context":"https://schema.org","@type":"NewsArticle","headline":meta_title,"description":meta_description,"image":[meta_image] if meta_image else [],"datePublished":article_published_time,"dateModified":article_modified_time or article_published_time,"mainEntityOfPage":meta_url,"publisher":{"@type":"Organization","name":organization_schema.name,"logo":{"@type":"ImageObject","url":organization_schema.logo}}} | tojson }}
-  </script>
-  {% endif %}
+  <script type="application/ld+json">{{ {"@context":"https://schema.org","@type":"NewsMediaOrganization","name":organization_schema.name,"url":organization_schema.url,"logo":organization_schema.logo,"email":organization_schema.email,"telephone":organization_schema.telephone,"sameAs":[social_links.instagram, social_links.facebook, social_links.youtube, social_links.x] | select | list} | tojson }}</script>
+  {% if meta_type == 'article' %}<script type="application/ld+json">{{ {"@context":"https://schema.org","@type":"NewsArticle","headline":meta_title,"description":meta_description,"image":[meta_image] if meta_image else [],"datePublished":article_published_time,"dateModified":article_modified_time or article_published_time,"mainEntityOfPage":meta_url,"publisher":{"@type":"Organization","name":organization_schema.name,"logo":{"@type":"ImageObject","url":organization_schema.logo}}} | tojson }}</script>{% endif %}
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
-  {% if google_analytics_id %}
-  <script async src="https://www.googletagmanager.com/gtag/js?id={{ google_analytics_id }}"></script>
-  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','{{ google_analytics_id }}');</script>
-  {% endif %}
+  {% if google_analytics_id %}<script async src="https://www.googletagmanager.com/gtag/js?id={{ google_analytics_id }}"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','{{ google_analytics_id }}');</script>{% endif %}
 </head>
 <body class="pa-body">
-  <div class="pa-top-green"></div>
   <header class="pa-header">
-    <div class="pa-header-blue">
-      <a class="pa-logo" href="{{ url_for('site.home') }}" aria-label="{{ site_name_value }}">
-        <img src="{{ logo_url or url_for('static', filename='img/logo-parana-atual.svg') }}" alt="{{ site_name_value }}">
-      </a>
+    <div class="pa-utility-bar">
+      <div class="container-xl pa-utility-inner">
+        <span>Seja bem-vindo / <strong id="visitorLocation">Foz do Iguaçu</strong>, <span id="currentDate">--/--/----</span></span>
+        <a href="{{ footer_links.contact.url if footer_links and footer_links.contact else '#' }}">ANÚNCIE NO PARANÁ ATUAL</a>
+      </div>
     </div>
+
+    <div class="pa-header-blue">
+      <div class="container-xl pa-header-main">
+        <form class="pa-search" action="{{ url_for('site.search') }}" method="get" role="search">
+          <input type="search" name="q" placeholder="Buscar matéria..." aria-label="Buscar matéria">
+          <button type="submit" aria-label="Buscar"><i class="bi bi-search"></i></button>
+        </form>
+
+        <a class="pa-logo" href="{{ url_for('site.home') }}" aria-label="{{ site_name_value }}">
+          <img src="{{ logo_url or url_for('static', filename='img/logo-parana-atual.svg') }}" alt="{{ site_name_value }}">
+        </a>
+
+        <div class="pa-socials" aria-label="Redes sociais">
+          <a href="{{ social_links.facebook or '#' }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="bi bi-facebook"></i></a>
+          <a href="{{ social_links.instagram or '#' }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
+          <a href="{{ social_links.x or '#' }}" target="_blank" rel="noopener" aria-label="X"><i class="bi bi-twitter-x"></i></a>
+          <a href="{{ social_links.youtube or '#' }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="bi bi-youtube"></i></a>
+        </div>
+      </div>
+    </div>
+
     <nav class="pa-nav" aria-label="Menu principal">
       <div class="container-xl pa-nav-inner">
         <a href="{{ url_for('site.home') }}">INÍCIO</a>
-        {% for c in nav_categories[:7] %}
-          <a href="{{ url_for('site.category', slug=c.slug) }}">{{ c.name|upper }}</a>
-        {% endfor %}
+        {% for c in nav_categories[:7] %}<a href="{{ url_for('site.category', slug=c.slug) }}">{{ c.name|upper }}</a>{% endfor %}
       </div>
     </nav>
   </header>
 
-  <main class="container-xl pa-main">
-    {% block content %}{% endblock %}
-  </main>
+  <main class="container-xl pa-main">{% block content %}{% endblock %}</main>
 
   <footer class="pa-footer">
     <div class="pa-footer-blue">
-      <div class="container-xl">
-        <a class="pa-footer-logo" href="{{ url_for('site.home') }}">
-          <img src="{{ logo_url or url_for('static', filename='img/logo-parana-atual.svg') }}" alt="{{ site_name_value }}">
-        </a>
+      <div class="container-xl pa-footer-content">
+        <a class="pa-footer-logo" href="{{ url_for('site.home') }}"><img src="{{ logo_url or url_for('static', filename='img/logo-parana-atual.svg') }}" alt="{{ site_name_value }}"></a>
+        <div class="pa-footer-social-wrap">
+          <span>Redes Sociais:</span>
+          <div class="pa-socials pa-socials--footer">
+            <a href="{{ social_links.facebook or '#' }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="bi bi-facebook"></i></a>
+            <a href="{{ social_links.instagram or '#' }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
+            <a href="{{ social_links.x or '#' }}" target="_blank" rel="noopener" aria-label="X"><i class="bi bi-twitter-x"></i></a>
+            <a href="{{ social_links.youtube or '#' }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="bi bi-youtube"></i></a>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="pa-footer-green"></div>
+    <div class="pa-footer-green"><div class="container-xl">Desenvolvido e Atualizado por: <strong>Kevin Premoli</strong></div></div>
   </footer>
   <script>window.__SITE_ANALYTICS__={endpoint:"{{ url_for('site.analytics_collect') }}",path:"{{ request.path }}"};</script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

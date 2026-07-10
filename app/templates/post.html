@@ -1,64 +1,44 @@
 {% extends "base.html" %}
-{% block title %} - {{ post.title|striptags }}{% endblock %}
 {% block content %}
+<div class="pa-article-grid">
+  <article class="pa-article">
+    <div class="pa-article-kicker">{{ post.categories[0].name|upper if post.categories else 'NOTÍCIAS' }}</div>
+    <h1 class="pa-article-title">{{ post.title|safe }}</h1>
+    {% if post.excerpt %}<div class="pa-article-subtitle">{{ post.excerpt|safe }}</div>{% endif %}
 
-<div class="inner-grid article-layout">
-  <article class="article">
-    <div class="section-head article-category-head">
-      <h2>{{ post.categories[0].name if post.categories else 'Notícias' }}</h2>
-      <div class="section-line"></div>
+    <div class="pa-author-row">
+      <div class="pa-author-avatar"><i class="bi bi-person-fill"></i></div>
+      <div>
+        <div>Por <strong>{{ post.author_name or 'REDAÇÃO' }}</strong></div>
+        {% if post.published_at %}<div>{{ post.published_at.strftime('%d/%m/%Y') }} &nbsp;|&nbsp; Atualizado em {{ (post.updated_at or post.published_at).strftime('%d/%m/%Y - %Hh%M') }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div class="pa-share-row">
+      <a class="share-facebook" href="https://www.facebook.com/sharer/sharer.php?u={{ meta_url|urlencode }}" target="_blank" rel="noopener" aria-label="Compartilhar no Facebook"><i class="bi bi-facebook"></i></a>
+      <a class="share-x" href="https://twitter.com/intent/tweet?url={{ meta_url|urlencode }}&text={{ post.title|striptags|urlencode }}" target="_blank" rel="noopener" aria-label="Compartilhar no X"><i class="bi bi-twitter-x"></i></a>
+      <a class="share-whatsapp" href="https://wa.me/?text={{ (post.title|striptags ~ ' ' ~ meta_url)|urlencode }}" target="_blank" rel="noopener" aria-label="Compartilhar no WhatsApp"><i class="bi bi-whatsapp"></i></a>
     </div>
 
     {% if post.featured_image %}
-      <img src="{{ post.featured_image }}" class="article-cover" alt="">
+      <figure class="pa-article-figure">
+        <img src="{{ post.featured_image }}" alt="{{ post.title|striptags }}">
+        <figcaption>Foto: Divulgação</figcaption>
+      </figure>
     {% endif %}
 
-    <div class="article-meta">
-      <div class="article-tags">
-        {% for c in post.categories %}
-          <a class="tag" href="{{ url_for('site.category', slug=c.slug) }}">{{ c.name }}</a>
-        {% endfor %}
-      </div>
-      {% if post.published_at %}
-        <div class="meta">{{ post.published_at.strftime('%d/%m/%Y %H:%M') }}</div>
-      {% endif %}
-    </div>
+    <div class="pa-article-content">{{ post.content_html|safe }}</div>
 
-    <h1 class="article-title">{{ post.title|safe }}</h1>
-
-    {% if post.excerpt %}
-      <div class="article-excerpt">{{ post.excerpt|safe }}</div>
-    {% endif %}
-
-    <div class="article-content">
-      {{ post.content_html|safe }}
-    </div>
-
-    <div class="article-inline-banner">
-      {% if ad_article_end %}
-        <div class="ad-box">{{ ad_article_end|safe }}</div>
-      {% else %}
-        <div class="ad-placeholder banner-wide" aria-hidden="true"></div>
-      {% endif %}
-    </div>
+    {% if ad_article_end %}<div class="pa-article-inline-ad">{{ ad_article_end|safe }}</div>{% endif %}
 
     {% if related_posts %}
     <section class="article-related-block">
-      <div class="section-head pp-head related-head">
-        <h2>Mais de {{ related_label }}</h2>
-        <div class="section-line"></div>
-      </div>
-
+      <div class="pa-section-head"><h2>MAIS NOTÍCIAS</h2></div>
       <div class="article-related-grid">
-        {% for p in related_posts %}
-        <a class="news-tile-card related-tile-card" href="{{ url_for('site.post', slug=p.slug) }}">
-          <div class="thumb-card-image thumb-small" style="background-image:url('{{ p.featured_image or '' }}')"></div>
-          <div class="story-meta-row">
-            <span class="tag">{{ (p.categories[0].name if p.categories else related_label) }}</span>
-            <span class="date-label">{{ format_date_br(p.published_at) }}</span>
-          </div>
-          <h3>{{ clean_text(p.title, 78) }}</h3>
-          <p>{{ clean_text(p.excerpt or p.content_html, 115) }}</p>
+        {% for p in related_posts[:3] %}
+        <a class="pa-news-card pa-news-card--section" href="{{ url_for('site.post', slug=p.slug) }}">
+          <div class="pa-news-card__img" style="background-image:url('{{ p.featured_image or '' }}')"></div>
+          <h3>{{ clean_text(p.title, 85) }}</h3>
         </a>
         {% endfor %}
       </div>
@@ -66,50 +46,10 @@
     {% endif %}
   </article>
 
-  <aside class="right-rail article-rail">
-    {% if latest_posts %}
-    <section class="rail-block">
-      <div class="section-head pp-head rail-head">
-        <h2>Últimas matérias</h2>
-        <div class="section-line"></div>
-      </div>
-
-      <div class="rail-latest-list">
-        {% for p in latest_posts %}
-        <a class="side-story-card rail-story-card" href="{{ url_for('site.post', slug=p.slug) }}">
-          <div class="thumb-card-image side-thumb" style="background-image:url('{{ p.featured_image or '' }}')"></div>
-          <div class="story-meta-row">
-            <span class="tag">{{ (p.categories[0].name if p.categories else 'Notícias') }}</span>
-            <span class="date-label">{{ format_date_br(p.published_at) }}</span>
-          </div>
-          <h3>{{ clean_text(p.title, 80) }}</h3>
-        </a>
-        {% endfor %}
-      </div>
-    </section>
-    {% endif %}
-
-    <section class="rail-block">
-      <div class="section-head pp-head rail-head">
-        <h2>Publicidade</h2>
-        <div class="section-line"></div>
-      </div>
-
-      <div class="rail-ads-stack">
-        {% if ad_sidebar_1 %}
-          <div class="ad-box rail-ad-box">{{ ad_sidebar_1|safe }}</div>
-        {% else %}
-          <div class="ad-placeholder ad-placeholder--square" aria-hidden="true"></div>
-        {% endif %}
-
-        {% if ad_sidebar_2 %}
-          <div class="ad-box rail-ad-box">{{ ad_sidebar_2|safe }}</div>
-        {% else %}
-          <div class="ad-placeholder ad-placeholder--square" aria-hidden="true"></div>
-        {% endif %}
-      </div>
-    </section>
+  <aside class="pa-article-sidebar">
+    <div class="pa-ad pa-ad--green">{% if ad_sidebar_1 %}{{ ad_sidebar_1|safe }}{% endif %}</div>
+    <div class="pa-ad pa-ad--blue">{% if ad_header %}{{ ad_header|safe }}{% endif %}</div>
+    <div class="pa-ad pa-ad--green pa-ad--tall">{% if ad_sidebar_2 %}{{ ad_sidebar_2|safe }}{% endif %}</div>
   </aside>
 </div>
-
 {% endblock %}

@@ -1,4 +1,32 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const dateEl = document.getElementById('currentDate');
+  const locationEl = document.getElementById('visitorLocation');
+  if (dateEl) dateEl.textContent = new Intl.DateTimeFormat('pt-BR').format(new Date());
+
+  const cachedCity = localStorage.getItem('pa_visitor_city');
+  if (cachedCity && locationEl) locationEl.textContent = cachedCity;
+
+  if (locationEl && navigator.geolocation && !cachedCity) {
+    navigator.geolocation.getCurrentPosition(async ({coords}) => {
+      try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.latitude}&lon=${coords.longitude}&zoom=10&accept-language=pt-BR`;
+        const response = await fetch(url, {headers:{'Accept':'application/json'}});
+        if (!response.ok) return;
+        const data = await response.json();
+        const address = data.address || {};
+        const city = address.city || address.town || address.municipality || address.village;
+        if (city) {
+          locationEl.textContent = city;
+          localStorage.setItem('pa_visitor_city', city);
+        }
+      } catch (error) {
+        // Mantém a cidade padrão quando a localização não puder ser obtida.
+      }
+    }, () => {}, {enableHighAccuracy:false,timeout:5000,maximumAge:86400000});
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-rotative]').forEach((section) => {
     const track = section.querySelector('[data-rotative-track]');
     const title = section.querySelector('.rotative-title');
