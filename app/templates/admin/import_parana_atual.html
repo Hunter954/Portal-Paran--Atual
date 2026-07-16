@@ -1,7 +1,7 @@
 {% extends "admin/layout.html" %}
 {% block admin_title %}Importar Paraná Atual{% endblock %}
 {% block page_title %}Importar matérias do Paraná Atual{% endblock %}
-{% block page_subtitle %}Puxe título, texto e foto do site atual e salve as imagens no volume do Railway por enquanto.{% endblock %}
+{% block page_subtitle %}Importe primeiro as matérias mais recentes, preserve a categoria original e atualize matérias já importadas.{% endblock %}
 {% block admin_content %}
 <div class="row g-4">
   <div class="col-lg-8">
@@ -13,7 +13,7 @@
           <div class="col-12">
             <label class="form-label">URL para buscar</label>
             <input class="form-control" name="source_url" value="{{ source_url }}" placeholder="https://www.paranaatual.com.br/">
-            <div class="form-text">Use a home, uma categoria ou a URL direta de uma matéria.</div>
+            <div class="form-text">Use a home, /noticias, uma categoria ou a URL direta. A busca ordena as matérias pelo ID mais recente.</div>
           </div>
           <div class="col-md-4">
             <label class="form-label">Limite</label>
@@ -61,7 +61,7 @@
           {% for item in imported_items %}
           <div class="list-group-item px-0 d-flex justify-content-between gap-3">
             <div><strong>{{ item.title }}</strong><br><a href="{{ item.url }}" target="_blank" rel="noopener" class="small">{{ item.url }}</a></div>
-            <span class="badge {% if item.status == 'Importada' %}text-bg-success{% else %}text-bg-secondary{% endif %} align-self-start">{{ item.status }}</span>
+            <span class="badge {% if item.status == 'Importada' %}text-bg-success{% elif item.status == 'Atualizada' %}text-bg-primary{% else %}text-bg-secondary{% endif %} align-self-start">{{ item.status }}</span>
           </div>
           {% endfor %}
         </div>

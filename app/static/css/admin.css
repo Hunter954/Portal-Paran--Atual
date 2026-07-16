@@ -221,3 +221,16 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFo
 @media (max-width: 767px) { .settings-category-grid, .admin-inline-info { grid-template-columns: 1fr; } }
 
 .guide-admin-stack{display:grid;gap:18px}
+
+/* Mapa visual de publicidade inspirado na estrutura real do portal */
+.ads-site-preview{overflow:hidden;border:1px solid #d8dee9;border-radius:18px;background:#f7f8fb}
+.ads-site-preview__chrome{margin:-18px -18px 20px;background:#fff;border-bottom:1px solid #e5e7eb}
+.ads-site-preview__topbar{display:flex;justify-content:space-between;padding:6px 20px;background:#12ef2a;color:#163986;font-size:10px;font-weight:800}
+.ads-site-preview__header{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;gap:16px;padding:18px 24px;background:#173887;color:#fff}
+.ads-site-preview__search{height:28px;max-width:220px;border-radius:5px;background:#fff;opacity:.95}
+.ads-site-preview__logo{text-align:center;font-size:22px;font-weight:900}.ads-site-preview__logo b{color:#12ef2a}.ads-site-preview__social{text-align:right;letter-spacing:5px}
+.ads-site-preview__nav{text-align:center;padding:14px 12px;font-size:11px;font-weight:900;color:#111;white-space:nowrap;overflow:hidden}
+.ads-site-preview__caption{margin:0 0 14px;padding:10px 12px;border-radius:12px;background:#eef2ff;color:#334155;font-size:13px;font-weight:700}
+.ads-home-preview-main:before{content:'CONTEÚDO PRINCIPAL / HOME E MATÉRIA';display:block;margin:2px 0 8px;color:#64748b;font-size:11px;font-weight:800;letter-spacing:.05em}
+.ads-home-preview-side:before{content:'COLUNA LATERAL DAS CATEGORIAS';display:block;margin:2px 0 8px;color:#64748b;font-size:11px;font-weight:800;letter-spacing:.05em}
+@media(max-width:700px){.ads-site-preview__header{grid-template-columns:1fr}.ads-site-preview__search{display:none}.ads-site-preview__social{text-align:center}.ads-site-preview__nav{font-size:9px}.ads-site-preview__topbar{gap:12px}}

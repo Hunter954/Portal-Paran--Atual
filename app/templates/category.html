@@ -1,52 +1,45 @@
 {% extends "base.html" %}
 {% block title %} - {{ cat.name }}{% endblock %}
 {% block content %}
-
-<div class="inner-grid">
-  <div>
-    <div class="section-head">
+<div class="category-page">
+  <div class="category-main">
+    <div class="section-head category-head">
       <h2>{{ cat.name }}</h2>
       <div class="section-line"></div>
     </div>
 
-    <div class="recent-grid">
+    {% if pagination.items %}
+    <div class="category-card-grid">
       {% for p in pagination.items %}
-        <a class="recent-card" href="{{ url_for('site.post', slug=p.slug) }}">
-          <div class="recent-img" style="background-image:url('{{ p.featured_image or '' }}')"></div>
-          <div class="recent-body">
-            <div class="tag small">{{ (p.categories[0].name if p.categories else cat.name) }}</div>
-            <div class="recent-title">{{ p.title|safe }}</div>
-            <div class="meta">{{ p.published_at.strftime('%d %b, %Y') if p.published_at else '' }}</div>
-          </div>
-        </a>
+      <a class="category-card" href="{{ url_for('site.post', slug=p.slug) }}">
+        <div class="category-card__image" style="background-image:url('{{ p.featured_image or '' }}')"></div>
+        <div class="category-card__body">
+          <div class="category-card__title">{{ clean_text(p.title) }}</div>
+          {% if p.published_at %}<div class="category-card__date">{{ p.published_at.strftime('%d/%m/%Y') }}</div>{% endif %}
+        </div>
+      </a>
       {% endfor %}
     </div>
+    {% else %}
+      <div class="category-empty">Nenhuma matéria publicada nesta categoria.</div>
+    {% endif %}
 
-    <nav class="mt-4">
-      <ul class="pagination">
-        {% if pagination.has_prev %}
-          <li class="page-item"><a class="page-link" href="{{ url_for('site.category', slug=cat.slug, page=pagination.prev_num) }}">Anterior</a></li>
-        {% endif %}
-        <li class="page-item disabled"><span class="page-link">Página {{ pagination.page }} / {{ pagination.pages }}</span></li>
-        {% if pagination.has_next %}
-          <li class="page-item"><a class="page-link" href="{{ url_for('site.category', slug=cat.slug, page=pagination.next_num) }}">Próxima</a></li>
-        {% endif %}
-      </ul>
+    {% if pagination.pages > 1 %}
+    <nav class="category-pagination" aria-label="Navegação entre páginas">
+      {% if pagination.has_prev %}<a href="{{ url_for('site.category', slug=cat.slug, page=pagination.prev_num) }}" aria-label="Página anterior">‹</a>{% endif %}
+      {% for number in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if number %}
+          {% if number == pagination.page %}<span class="is-active">{{ number }}</span>{% else %}<a href="{{ url_for('site.category', slug=cat.slug, page=number) }}">{{ number }}</a>{% endif %}
+        {% else %}<span class="is-gap">…</span>{% endif %}
+      {% endfor %}
+      {% if pagination.has_next %}<a href="{{ url_for('site.category', slug=cat.slug, page=pagination.next_num) }}" aria-label="Próxima página">›</a>{% endif %}
     </nav>
+    {% endif %}
   </div>
 
-  <aside class="right-rail">
-    {% if ad_sidebar_1 %}
-      <div class="ad-box mb-3">{{ ad_sidebar_1|safe }}</div>
-    {% else %}
-      <div class="ad-placeholder ad-placeholder--square" aria-hidden="true"></div>
-    {% endif %}
-    {% if ad_sidebar_2 %}
-      <div class="ad-box">{{ ad_sidebar_2|safe }}</div>
-    {% else %}
-      <div class="ad-placeholder ad-placeholder--square" aria-hidden="true"></div>
-    {% endif %}
+  <aside class="category-sidebar">
+    {% if ad_sidebar_1 %}<div class="ad-box">{{ ad_sidebar_1|safe }}</div>{% else %}<div class="ad-placeholder ad-placeholder--square" aria-hidden="true"></div>{% endif %}
+    {% if ad_sidebar_2 %}<div class="ad-box">{{ ad_sidebar_2|safe }}</div>{% else %}<div class="ad-placeholder ad-placeholder--square" aria-hidden="true"></div>{% endif %}
   </aside>
 </div>
-
 {% endblock %}

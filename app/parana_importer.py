@@ -33,23 +33,57 @@ def soup_from_url(url: str) -> BeautifulSoup:
     return BeautifulSoup(response.text, "lxml")
 
 
+def _article_id(url: str) -> int:
+    match = re.search(r"/noticia/(\d+)/", urlparse(url).path)
+    return int(match.group(1)) if match else 0
+
+
 def collect_links(start_url: str = BASE_URL, limit: int = 30) -> list[ImportCandidate]:
-    soup = soup_from_url(start_url)
+    """Coleta matérias priorizando sempre os maiores IDs (mais recentes).
+
+    A home antiga mistura destaques e matérias antigas. Por isso também consultamos
+    /noticias e as editorias encontradas no menu, removemos duplicatas e só então
+    aplicamos o limite.
+    """
+    queue = [start_url]
+    if start_url.rstrip('/') == BASE_URL:
+        queue.append(f"{BASE_URL}/noticias")
+
     found: dict[str, ImportCandidate] = {}
-    for a in soup.select('a[href]'):
-        href = urljoin(start_url, a.get('href', ''))
-        parsed = urlparse(href)
-        if parsed.netloc and 'paranaatual.com.br' not in parsed.netloc:
+    visited: set[str] = set()
+    max_pages = 25
+
+    while queue and len(visited) < max_pages:
+        page_url = queue.pop(0)
+        if page_url in visited:
             continue
-        if '/noticia/' not in parsed.path or not parsed.path.endswith('.html'):
-            continue
-        href = href.split('#', 1)[0]
-        title = re.sub(r'\s+', ' ', a.get_text(' ', strip=True) or '').strip()
-        if href not in found:
-            found[href] = ImportCandidate(url=href, title=title)
-        if len(found) >= limit:
+        visited.add(page_url)
+        soup = soup_from_url(page_url)
+
+        for a in soup.select('a[href]'):
+            href = urljoin(page_url, a.get('href', '')).split('#', 1)[0]
+            parsed = urlparse(href)
+            if parsed.netloc and 'paranaatual.com.br' not in parsed.netloc:
+                continue
+            path = parsed.path.rstrip('/')
+            if '/noticia/' in path and path.endswith('.html'):
+                title = _clean_text(a.get_text(' ', strip=True) or '')
+                current = found.get(href)
+                if not current or (not current.title and title):
+                    found[href] = ImportCandidate(url=href, title=title)
+                continue
+
+            # Descobre páginas de editoria e paginação do próprio portal antigo.
+            if path == '/noticias' or path.startswith('/noticias/'):
+                if href not in visited and href not in queue:
+                    queue.append(href)
+
+        # Evita varrer o site inteiro quando já há boa margem para ordenar.
+        if len(found) >= max(limit * 3, 150):
             break
-    return list(found.values())
+
+    ordered = sorted(found.values(), key=lambda item: _article_id(item.url), reverse=True)
+    return ordered[:limit]
 
 
 def _clean_text(value: str) -> str:
@@ -66,6 +100,27 @@ def _find_main_container(soup: BeautifulSoup):
             return node
     return soup.body or soup
 
+
+
+def _category_slug_from_url(url: str) -> str:
+    parts = [part for part in urlparse(url).path.split('/') if part]
+    # /noticia/<id>/<cidade>/<categoria>/<slug>.html
+    if len(parts) >= 5 and parts[0] == 'noticia':
+        return slugify(parts[-2])
+    return ''
+
+
+def _category_name_from_slug(value: str) -> str:
+    if not value:
+        return 'Notícias'
+    known = {
+        'curitiba-e-regiao': 'Curitiba e Região',
+        'oeste-e-sudoeste': 'Oeste e Sudoeste',
+        'campos-gerais-e-sul': 'Campos Gerais e Sul',
+        'norte-e-noroeste': 'Norte e Noroeste',
+        'voce-reporter': 'Você Repórter',
+    }
+    return known.get(value, value.replace('-', ' ').title())
 
 def parse_article(url: str) -> dict:
     soup = soup_from_url(url)
@@ -152,6 +207,8 @@ def parse_article(url: str) -> dict:
         'author_name': author or 'Portal Paraná Atual',
         'image_url': image_url,
         'image_credit': credit,
+        'category_slug': _category_slug_from_url(url),
+        'category_name': _category_name_from_slug(_category_slug_from_url(url)),
     }
 
 

@@ -34,6 +34,11 @@
     </div>
 
     <div class="ads-site-preview">
+      <div class="ads-site-preview__chrome">
+        <div class="ads-site-preview__topbar">PORTAL PARANÁ ATUAL <span>ANUNCIE NO PARANÁ ATUAL</span></div>
+        <div class="ads-site-preview__header"><div class="ads-site-preview__search"></div><div class="ads-site-preview__logo">PARANÁ <b>ATUAL</b></div><div class="ads-site-preview__social">● ● ● ●</div></div>
+        <div class="ads-site-preview__nav">INÍCIO &nbsp; BRASIL &nbsp; CIDADE &nbsp; ECONOMIA &nbsp; EDUCAÇÃO &nbsp; ESPORTE &nbsp; POLICIAL &nbsp; POLÍTICA</div>
+      </div>
       {% for item in slot_cards if item.slot.key == 'header_top' %}
       <a class="ads-preview-slot ads-preview-slot--wide" href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}">
         <span class="ads-preview-badge">{{ item.label }}</span>
@@ -42,6 +47,7 @@
       </a>
       {% endfor %}
 
+      <div class="ads-site-preview__caption">Clique nos blocos destacados para editar a publicidade daquele local.</div>
       <div class="ads-home-preview-grid">
         <div class="ads-home-preview-main">
           {% for key in ['home_top', 'home_mid', 'home_bottom'] %}

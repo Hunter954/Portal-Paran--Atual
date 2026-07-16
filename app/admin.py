@@ -141,7 +141,7 @@ def _default_slot_layout_meta() -> dict:
             'label': 'Rodapé',
             'hint': 'Banner grande no rodapé do site',
             'shape': 'wide',
-            'dimensions': '420 × 170 px',
+            'dimensions': '1170 × 250 px',
         },
         'sidebar_1': {
             'label': 'Lateral 1',
@@ -1133,45 +1133,43 @@ def importar_parana_atual():
                 } for c in candidates]
                 flash(f'{len(preview_items)} link(s) encontrado(s).', 'info')
             else:
-                default_category = Category.query.filter_by(slug='cidade').first() or Category.query.order_by(Category.id.asc()).first()
-                if not default_category:
-                    default_category = Category(name='Cidade', slug='cidade')
-                    db.session.add(default_category)
-                    db.session.flush()
                 for c in candidates:
-                    if c.url in already:
-                        imported_items.append({'url': c.url, 'title': c.title or c.url, 'status': 'Já existia'})
-                        continue
                     try:
                         data = parse_article(c.url)
-                        slug = _ensure_unique_slug(Post, data.get('slug') or data.get('title') or 'materia')
+                        existing_post = Post.query.filter_by(source_url=c.url).first()
+                        slug = existing_post.slug if existing_post else _ensure_unique_slug(Post, data.get('slug') or data.get('title') or 'materia')
                         image_local = ''
                         if data.get('image_url'):
                             try:
                                 image_local = save_image_locally(data['image_url'], slug)
                             except Exception as img_exc:
                                 errors.append(f'Imagem não importada em {c.url}: {img_exc}')
-                        post = Post(
-                            source='parana_atual_import',
-                            source_url=c.url,
-                            title=(data.get('title') or 'Matéria importada').strip(),
-                            slug=slug,
-                            excerpt=(data.get('excerpt') or '').strip() or None,
-                            content_html=(data.get('content_html') or '').strip() or None,
-                            featured_image=image_local or data.get('image_url') or None,
-                            author_name=(data.get('author_name') or 'Portal Paraná Atual').strip(),
-                            published_at=data.get('published_at') or datetime.utcnow(),
-                            updated_at=datetime.utcnow(),
-                        )
-                        post.categories = [default_category]
+                        post = existing_post or Post(source='parana_atual_import', source_url=c.url, slug=slug)
+                        post.title = (data.get('title') or 'Matéria importada').strip()
+                        post.excerpt = (data.get('excerpt') or '').strip() or None
+                        post.content_html = (data.get('content_html') or '').strip() or None
+                        post.featured_image = image_local or post.featured_image or data.get('image_url') or None
+                        post.author_name = (data.get('author_name') or 'Portal Paraná Atual').strip()
+                        post.published_at = data.get('published_at') or post.published_at or datetime.utcnow()
+                        post.updated_at = datetime.utcnow()
+                        category_slug = (data.get('category_slug') or 'noticias').strip()
+                        category_name = (data.get('category_name') or 'Notícias').strip()
+                        category = Category.query.filter_by(slug=category_slug).first()
+                        if not category:
+                            category = Category(name=category_name, slug=category_slug)
+                            db.session.add(category)
+                            db.session.flush()
+                        else:
+                            category.name = category_name
+                        post.categories = [category]
                         db.session.add(post)
                         db.session.commit()
                         already.add(c.url)
-                        imported_items.append({'url': c.url, 'title': post.title, 'status': 'Importada'})
+                        imported_items.append({'url': c.url, 'title': post.title, 'status': 'Atualizada' if existing_post else 'Importada'})
                     except Exception as exc:
                         db.session.rollback()
                         errors.append(f'Erro em {c.url}: {exc}')
-                flash(f'{sum(1 for item in imported_items if item["status"] == "Importada")} matéria(s) importada(s).', 'success')
+                flash(f'{sum(1 for item in imported_items if item["status"] == "Importada")} nova(s) e {sum(1 for item in imported_items if item["status"] == "Atualizada")} atualizada(s).', 'success')
         except Exception as exc:
             db.session.rollback()
             errors.append(str(exc))
