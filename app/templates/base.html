@@ -70,6 +70,10 @@
 
   <main class="container-xl pa-main">{% block content %}{% endblock %}</main>
 
+  {% if ad_home_bottom %}
+  <div class="container-xl pa-footer-ad">{{ ad_home_bottom|safe }}</div>
+  {% endif %}
+
   <footer class="pa-footer">
     <div class="pa-footer-blue">
       <div class="container-xl pa-footer-content">

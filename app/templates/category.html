@@ -1,23 +1,25 @@
 {% extends "base.html" %}
 {% block title %} - {{ cat.name }}{% endblock %}
 {% block content %}
-<div class="category-page">
+<section class="category-page">
   <div class="category-main">
-    <div class="section-head category-head">
-      <h2>{{ cat.name }}</h2>
-      <div class="section-line"></div>
-    </div>
+    <h1 class="category-title">{{ cat.name|upper }}</h1>
 
     {% if pagination.items %}
     <div class="category-card-grid">
       {% for p in pagination.items %}
-      <a class="category-card" href="{{ url_for('site.post', slug=p.slug) }}">
-        <div class="category-card__image" style="background-image:url('{{ p.featured_image or '' }}')"></div>
-        <div class="category-card__body">
-          <div class="category-card__title">{{ clean_text(p.title) }}</div>
-          {% if p.published_at %}<div class="category-card__date">{{ p.published_at.strftime('%d/%m/%Y') }}</div>{% endif %}
-        </div>
-      </a>
+      <article class="category-card">
+        <a class="category-card__image-link" href="{{ url_for('site.post', slug=p.slug) }}" aria-label="{{ clean_text(p.title) }}">
+          {% if p.featured_image %}
+          <img class="category-card__image" src="{{ p.featured_image }}" alt="{{ clean_text(p.title) }}" loading="lazy">
+          {% else %}
+          <div class="category-card__image category-card__image--empty"></div>
+          {% endif %}
+        </a>
+        <h2 class="category-card__title">
+          <a href="{{ url_for('site.post', slug=p.slug) }}">{{ clean_text(p.title) }}</a>
+        </h2>
+      </article>
       {% endfor %}
     </div>
     {% else %}
@@ -37,9 +39,10 @@
     {% endif %}
   </div>
 
-  <aside class="category-sidebar">
-    {% if ad_sidebar_1 %}<div class="ad-box">{{ ad_sidebar_1|safe }}</div>{% else %}<div class="ad-placeholder ad-placeholder--square" aria-hidden="true"></div>{% endif %}
-    {% if ad_sidebar_2 %}<div class="ad-box">{{ ad_sidebar_2|safe }}</div>{% else %}<div class="ad-placeholder ad-placeholder--square" aria-hidden="true"></div>{% endif %}
+  <aside class="category-sidebar" aria-label="Publicidade">
+    <div class="pa-ad pa-ad--green">{% if ad_sidebar_1 %}{{ ad_sidebar_1|safe }}{% endif %}</div>
+    <div class="pa-ad pa-ad--blue">{% if ad_header %}{{ ad_header|safe }}{% endif %}</div>
+    <div class="pa-ad pa-ad--green pa-ad--tall">{% if ad_sidebar_2 %}{{ ad_sidebar_2|safe }}{% endif %}</div>
   </aside>
-</div>
+</section>
 {% endblock %}

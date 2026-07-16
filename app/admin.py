@@ -119,41 +119,29 @@ def _parse_ad_slot_payload(raw: str | None) -> dict | None:
 
 def _default_slot_layout_meta() -> dict:
     return {
-        'header_top': {
-            'label': 'Topo do site',
-            'hint': 'Faixa principal do cabeçalho',
-            'shape': 'wide',
-            'dimensions': '1170 × 250 px',
-        },
-        'home_top': {
-            'label': 'Meio da home',
-            'hint': 'Banner exibido no meio da página inicial',
-            'shape': 'wide',
-            'dimensions': '1170 × 250 px',
-        },
-        'home_mid': {
-            'label': 'Final da matéria',
-            'hint': 'Banner exibido somente no fim das matérias',
-            'shape': 'wide',
-            'dimensions': '1170 × 250 px',
-        },
-        'home_bottom': {
-            'label': 'Rodapé',
-            'hint': 'Banner grande no rodapé do site',
-            'shape': 'wide',
-            'dimensions': '1170 × 250 px',
-        },
         'sidebar_1': {
-            'label': 'Lateral 1',
-            'hint': 'Primeiro banner lateral da sessão de categorias',
+            'label': 'Publicidade lateral 1',
+            'hint': 'Primeiro banner quadrado da coluna lateral',
             'shape': 'square',
             'dimensions': '300 × 300 px',
+        },
+        'header_top': {
+            'label': 'Publicidade lateral 2',
+            'hint': 'Segundo banner da coluna lateral',
+            'shape': 'rectangle',
+            'dimensions': '300 × 200 px',
         },
         'sidebar_2': {
-            'label': 'Lateral 2',
-            'hint': 'Segundo banner lateral da sessão de categorias',
-            'shape': 'square',
-            'dimensions': '300 × 300 px',
+            'label': 'Publicidade lateral 3',
+            'hint': 'Terceiro banner vertical da coluna lateral',
+            'shape': 'tall',
+            'dimensions': '300 × 400 px',
+        },
+        'home_bottom': {
+            'label': 'Publicidade do rodapé',
+            'hint': 'Banner horizontal exibido antes do rodapé do site',
+            'shape': 'wide',
+            'dimensions': '1170 × 250 px',
         },
     }
 
@@ -1518,7 +1506,10 @@ def ads_editor():
     r = _require_admin()
     if r:
         return r
-    slots = AdSlot.query.order_by(AdSlot.key.asc()).all()
+    allowed_keys = ('sidebar_1', 'header_top', 'sidebar_2', 'home_bottom')
+    slots = AdSlot.query.filter(AdSlot.key.in_(allowed_keys)).all()
+    order = {key: index for index, key in enumerate(allowed_keys)}
+    slots.sort(key=lambda item: order.get(item.key, 999))
     slot_cards = [_slot_card_data(slot) for slot in slots]
     return render_template("admin/ads_editor.html", slot_cards=slot_cards, **_common_admin_context("ads"))
 
