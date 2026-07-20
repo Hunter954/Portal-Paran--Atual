@@ -38,6 +38,7 @@
         {% for p in related_posts[:3] %}
         <a class="pa-news-card pa-news-card--section" href="{{ url_for('site.post', slug=p.slug) }}">
           <div class="pa-news-card__img" style="background-image:url('{{ p.featured_image or '' }}')"></div>
+          <span class="pa-category-tag">{{ (p.categories[0].name if p.categories else 'NOTÍCIAS')|upper }}</span>
           <h3>{{ clean_text(p.title, 85) }}</h3>
         </a>
         {% endfor %}

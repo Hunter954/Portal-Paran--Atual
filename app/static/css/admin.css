@@ -252,3 +252,21 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFo
 .ads-preview-footer{margin:16px}
 .ads-site-preview__fake-footer{padding:20px;text-align:center;background:#173887;color:#fff;font-weight:900;letter-spacing:.08em}
 @media(max-width:700px){.ads-category-preview{grid-template-columns:1fr}.ads-category-preview__sidebar{display:grid;grid-template-columns:repeat(2,1fr)}.ads-category-preview__cards{grid-template-columns:repeat(2,1fr)}}
+
+
+/* Prévia fiel da home no editor de publicidade */
+.ads-home-preview{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:16px;padding:16px;background:#fff}
+.ads-home-preview__hero{position:relative;min-height:235px;border-radius:8px;overflow:hidden;background:linear-gradient(180deg,#cfd7e3 0%,#98a4b5 100%);display:flex;align-items:flex-end;padding:18px}
+.ads-home-preview__hero strong{position:relative;color:#fff;font-size:17px;line-height:1.15;max-width:80%}
+.ads-home-preview__cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 8px;margin-top:14px}
+.ads-home-preview__cards div span{display:block;aspect-ratio:16/10;border-radius:4px;background:#dbe2ec}
+.ads-home-preview__cards small{display:block;margin-top:6px;color:#111;font-size:9px;font-weight:800;line-height:1.2}
+.ads-home-preview__cards small b{display:table;padding:3px 5px;margin-bottom:4px;background:#12ef2a;color:#073b17;font-size:7px}
+.ads-home-preview__section-title{display:block;color:#173887;font-size:16px;margin-top:18px}
+.ads-home-preview__sidebar{display:flex;flex-direction:column;gap:12px}
+.ads-home-preview__sidebar .ads-preview-slot{padding:10px;border-radius:12px}
+.ads-home-preview__sidebar .ads-preview-badge{font-size:9px;padding:4px 7px;margin-bottom:7px}
+.ads-home-preview__sidebar .ads-preview-meta{font-size:9px;margin-top:7px}
+.ads-home-preview__sidebar .ads-preview-art strong{font-size:12px;text-align:center}
+.ads-home-preview__sidebar .ads-preview-art small{font-size:9px}
+@media(max-width:700px){.ads-home-preview{grid-template-columns:1fr}.ads-home-preview__sidebar{display:grid;grid-template-columns:repeat(2,1fr)}.ads-home-preview__cards{grid-template-columns:repeat(2,1fr)}}

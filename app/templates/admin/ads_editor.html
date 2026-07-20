@@ -1,7 +1,7 @@
 {% extends 'admin/layout.html' %}
 {% block admin_title %}Publicidade{% endblock %}
 {% block page_title %}Editor visual de publicidade{% endblock %}
-{% block page_subtitle %}O portal possui três espaços na lateral das páginas e um banner antes do rodapé.{% endblock %}
+{% block page_subtitle %}O portal possui três espaços de publicidade na lateral da home e das matérias internas.{% endblock %}
 {% block admin_content %}
 <section class="panel-card ads-guide-card">
   <div class="ads-guide-grid">
@@ -14,7 +14,7 @@
 <section class="ads-visual-layout">
   <div class="panel-card ads-visual-canvas">
     <div class="ads-visual-topline">
-      <div><h2>Mapa real dos anúncios</h2><p>A prévia abaixo replica a página de categoria do portal.</p></div>
+      <div><h2>Mapa real dos anúncios</h2><p>A prévia abaixo replica a página inicial do portal.</p></div>
       <a class="btn btn-outline-dark" href="{{ url_for('site.home') }}" target="_blank" rel="noopener">Ver site real</a>
     </div>
 
@@ -25,12 +25,14 @@
         <div class="ads-site-preview__nav">INÍCIO &nbsp; BRASIL &nbsp; CIDADE &nbsp; ECONOMIA &nbsp; EDUCAÇÃO &nbsp; ESPORTE &nbsp; POLICIAL &nbsp; POLÍTICA</div>
       </div>
 
-      <div class="ads-category-preview">
-        <div class="ads-category-preview__content">
-          <strong class="ads-category-preview__title">POLÍTICA</strong>
-          <div class="ads-category-preview__cards">{% for i in range(9) %}<div><span></span><small>Título da matéria publicado no portal</small></div>{% endfor %}</div>
+      <div class="ads-home-preview">
+        <div class="ads-home-preview__content">
+          <div class="ads-home-preview__hero"><span></span><strong>Manchete principal publicada no portal</strong></div>
+          <div class="ads-home-preview__cards">{% for i in range(3) %}<div><span></span><small><b>OESTE E SUDOESTE</b>Título da matéria publicado no portal</small></div>{% endfor %}</div>
+          <strong class="ads-home-preview__section-title">CIDADE</strong>
+          <div class="ads-home-preview__cards">{% for i in range(3) %}<div><span></span><small><b>CIDADE</b>Título da matéria publicado no portal</small></div>{% endfor %}</div>
         </div>
-        <div class="ads-category-preview__sidebar">
+        <div class="ads-home-preview__sidebar">
           {% for key in ['sidebar_1', 'header_top', 'sidebar_2'] %}
             {% for item in slot_cards if item.slot.key == key %}
             <a class="ads-preview-slot ads-preview-slot--{{ item.shape }}" href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}">
@@ -43,14 +45,6 @@
         </div>
       </div>
 
-      {% for item in slot_cards if item.slot.key == 'home_bottom' %}
-      <a class="ads-preview-slot ads-preview-slot--wide ads-preview-footer" href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}">
-        <span class="ads-preview-badge">{{ item.label }}</span>
-        <div class="ads-preview-art {% if item.cover_image %}has-image{% endif %}">{% if item.cover_image %}<img src="{{ item.cover_image }}" alt="{{ item.label }}">{% else %}<strong>{{ item.label }}</strong><small>{{ item.dimensions }}</small>{% endif %}</div>
-        <div class="ads-preview-meta"><strong>{{ item.dimensions }}</strong><span>{{ item.banner_count }} banner(s)</span></div>
-      </a>
-      {% endfor %}
-      <div class="ads-site-preview__fake-footer">RODAPÉ DO PORTAL</div>
     </div>
   </div>
 

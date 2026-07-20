@@ -2,7 +2,7 @@
 {% block title %} - Buscar{% endblock %}
 {% block content %}
 
-<div class="inner-grid">
+<div class="search-page-full">
   <div>
     <div class="section-head">
       <h2>Buscar</h2>
@@ -40,18 +40,6 @@
     </nav>
   </div>
 
-  <aside class="right-rail">
-    {% if ad_sidebar_1 %}
-      <div class="ad-box mb-3">{{ ad_sidebar_1|safe }}</div>
-    {% else %}
-      <div class="ad-placeholder ad-placeholder--square" aria-hidden="true"></div>
-    {% endif %}
-    {% if ad_sidebar_2 %}
-      <div class="ad-box">{{ ad_sidebar_2|safe }}</div>
-    {% else %}
-      <div class="ad-placeholder ad-placeholder--square" aria-hidden="true"></div>
-    {% endif %}
-  </aside>
 </div>
 
 {% endblock %}

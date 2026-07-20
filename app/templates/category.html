@@ -16,6 +16,7 @@
           <div class="category-card__image category-card__image--empty"></div>
           {% endif %}
         </a>
+        <span class="pa-category-tag">{{ cat.name|upper }}</span>
         <h2 class="category-card__title">
           <a href="{{ url_for('site.post', slug=p.slug) }}">{{ clean_text(p.title) }}</a>
         </h2>
@@ -39,10 +40,5 @@
     {% endif %}
   </div>
 
-  <aside class="category-sidebar" aria-label="Publicidade">
-    <div class="pa-ad pa-ad--green">{% if ad_sidebar_1 %}{{ ad_sidebar_1|safe }}{% endif %}</div>
-    <div class="pa-ad pa-ad--blue">{% if ad_header %}{{ ad_header|safe }}{% endif %}</div>
-    <div class="pa-ad pa-ad--green pa-ad--tall">{% if ad_sidebar_2 %}{{ ad_sidebar_2|safe }}{% endif %}</div>
-  </aside>
 </section>
 {% endblock %}

@@ -498,26 +498,44 @@ def home():
     selected_cat_slug = (request.args.get("cat") or "").strip() or "cidade"
     selected_cat, selected_posts = cat_posts(selected_cat_slug, 8)
 
-    # Abaixo da manchete exibimos somente a editoria Cidade por enquanto.
-    # A busca considera uma fila maior para ainda encontrar três matérias sem
-    # repetir a manchete nem os três destaques superiores.
+    # Blocos editoriais exibidos abaixo dos destaques da home. Priorizamos as
+    # categorias escolhidas para o menu e completamos com as demais editorias.
     category_sections = []
     home_used_ids = {p.id for p in [lead_post, *latest_queue] if p}
     home_used_keys = {_post_identity(p) for p in [lead_post, *latest_queue] if p}
-    city_category = Category.query.filter_by(slug="cidade").first()
-    if city_category:
-        city_candidates = (_published_posts_query().join(Post.categories)
-                           .filter(Category.id == city_category.id)
-                           .order_by(desc(Post.published_at), desc(Post.id))
-                           .limit(100).all())
-        city_posts = _unique_posts(
-            city_candidates,
+    menu_category_ids = _setting_json("top_menu_category_ids", [])
+    try:
+        menu_category_ids = [int(item) for item in menu_category_ids]
+    except Exception:
+        menu_category_ids = []
+
+    all_categories = Category.query.all()
+    category_by_id = {category.id: category for category in all_categories}
+    ordered_categories = [category_by_id[item] for item in menu_category_ids if item in category_by_id]
+    ordered_ids = {category.id for category in ordered_categories}
+    ordered_categories.extend(sorted(
+        (category for category in all_categories if category.id not in ordered_ids),
+        key=_category_priority,
+    ))
+
+    for category_item in ordered_categories:
+        candidates = (_published_posts_query().join(Post.categories)
+                      .filter(Category.id == category_item.id)
+                      .order_by(desc(Post.published_at), desc(Post.id))
+                      .limit(100).all())
+        section_posts = _unique_posts(
+            candidates,
             limit=3,
             used_ids=home_used_ids,
             used_keys=home_used_keys,
         )
-        if city_posts:
-            category_sections.append({"category": city_category, "posts": city_posts})
+        if not section_posts:
+            continue
+        category_sections.append({"category": category_item, "posts": section_posts})
+        home_used_ids.update(post.id for post in section_posts)
+        home_used_keys.update(_post_identity(post) for post in section_posts)
+        if len(category_sections) >= 6:
+            break
 
     if (not selected_cat or not selected_posts) and category_sections:
         selected_cat = category_sections[0]["category"]
@@ -653,9 +671,6 @@ def category(slug):
         cat=cat,
         **meta,
         pagination=pagination,
-        ad_header=_get_ad("header_top"),
-        ad_sidebar_1=_get_ad("sidebar_1"),
-        ad_sidebar_2=_get_ad("sidebar_2"),
     )
 
 
@@ -684,7 +699,4 @@ def search():
         term=term,
         **meta,
         pagination=pagination,
-        ad_header=_get_ad("header_top"),
-        ad_sidebar_1=_get_ad("sidebar_1"),
-        ad_sidebar_2=_get_ad("sidebar_2"),
     )

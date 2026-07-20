@@ -137,12 +137,6 @@ def _default_slot_layout_meta() -> dict:
             'shape': 'tall',
             'dimensions': '300 × 400 px',
         },
-        'home_bottom': {
-            'label': 'Publicidade do rodapé',
-            'hint': 'Banner horizontal exibido antes do rodapé do site',
-            'shape': 'wide',
-            'dimensions': '1170 × 250 px',
-        },
     }
 
 
@@ -1506,7 +1500,7 @@ def ads_editor():
     r = _require_admin()
     if r:
         return r
-    allowed_keys = ('sidebar_1', 'header_top', 'sidebar_2', 'home_bottom')
+    allowed_keys = ('sidebar_1', 'header_top', 'sidebar_2')
     slots = AdSlot.query.filter(AdSlot.key.in_(allowed_keys)).all()
     order = {key: index for index, key in enumerate(allowed_keys)}
     slots.sort(key=lambda item: order.get(item.key, 999))

@@ -9,6 +9,7 @@
     <a class="pa-hero-card" href="{{ url_for('site.post', slug=hero.slug) }}" style="background-image:url('{{ hero.featured_image or '' }}')">
       <div class="pa-hero-img" style="background-image:url('{{ hero.featured_image or '' }}')"></div>
       <div class="pa-hero-overlay">
+        <span class="pa-category-tag">{{ (hero.categories[0].name if hero.categories else 'NOTÍCIAS')|upper }}</span>
         <h1>{{ clean_text(hero.title, 92) }}</h1>
         <p>{{ clean_text(hero.excerpt or hero.content_html, 150) }}</p>
       </div>
@@ -19,6 +20,7 @@
       {% for p in hero_cards %}
       <a class="pa-news-card" href="{{ url_for('site.post', slug=p.slug) }}">
         <div class="pa-news-card__img" style="background-image:url('{{ p.featured_image or '' }}')"></div>
+        <span class="pa-category-tag">{{ (p.categories[0].name if p.categories else 'NOTÍCIAS')|upper }}</span>
         <h3>{{ clean_text(p.title, 72) }}</h3>
         <p>{{ clean_text(p.excerpt or p.content_html, 120) }}</p>
       </a>
@@ -33,7 +35,7 @@
   </aside>
 </section>
 
-{% for section in category_sections[:1] %}
+{% for section in category_sections %}
   {% set posts = section.posts[:3] %}
   {% if posts %}
   <section class="pa-section-block">
@@ -45,6 +47,7 @@
       {% for p in posts %}
       <a class="pa-news-card pa-news-card--section" href="{{ url_for('site.post', slug=p.slug) }}">
         <div class="pa-news-card__img" style="background-image:url('{{ p.featured_image or '' }}')"></div>
+        <span class="pa-category-tag">{{ (p.categories[0].name if p.categories else section.category.name)|upper }}</span>
         <h3>{{ clean_text(p.title, 85) }}</h3>
       </a>
       {% endfor %}
