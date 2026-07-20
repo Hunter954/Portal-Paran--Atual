@@ -6,23 +6,27 @@
 <section class="pa-home-grid">
   <div class="pa-home-left">
     {% if hero %}
+    {% set hero_title = display_post_title(hero, limit=92) %}
+    {% set hero_summary = display_post_summary(hero, limit=150) %}
     <a class="pa-hero-card" href="{{ url_for('site.post', slug=hero.slug) }}" style="background-image:url('{{ hero.featured_image or '' }}')">
       <div class="pa-hero-img" style="background-image:url('{{ hero.featured_image or '' }}')"></div>
       <div class="pa-hero-overlay">
         <span class="pa-category-tag">{{ (hero.categories[0].name if hero.categories else 'NOTÍCIAS')|upper }}</span>
-        <h1>{{ clean_text(hero.title, 92) }}</h1>
-        <p>{{ clean_text(hero.excerpt or hero.content_html, 150) }}</p>
+        <h1>{{ hero_title }}</h1>
+        {% if hero_summary %}<p>{{ hero_summary }}</p>{% endif %}
       </div>
     </a>
     {% endif %}
 
     <div class="pa-card-row pa-card-row--top">
       {% for p in hero_cards %}
+      {% set card_title = display_post_title(p, limit=72) %}
+      {% set card_summary = display_post_summary(p, limit=120) %}
       <a class="pa-news-card" href="{{ url_for('site.post', slug=p.slug) }}">
         <div class="pa-news-card__img" style="background-image:url('{{ p.featured_image or '' }}')"></div>
         <span class="pa-category-tag">{{ (p.categories[0].name if p.categories else 'NOTÍCIAS')|upper }}</span>
-        <h3>{{ clean_text(p.title, 72) }}</h3>
-        <p>{{ clean_text(p.excerpt or p.content_html, 120) }}</p>
+        <h3>{{ card_title }}</h3>
+        {% if card_summary %}<p>{{ card_summary }}</p>{% endif %}
       </a>
       {% endfor %}
     </div>
@@ -48,7 +52,7 @@
       <a class="pa-news-card pa-news-card--section" href="{{ url_for('site.post', slug=p.slug) }}">
         <div class="pa-news-card__img" style="background-image:url('{{ p.featured_image or '' }}')"></div>
         <span class="pa-category-tag">{{ (p.categories[0].name if p.categories else section.category.name)|upper }}</span>
-        <h3>{{ clean_text(p.title, 85) }}</h3>
+        <h3>{{ display_post_title(p, section.category.name, 85) }}</h3>
       </a>
       {% endfor %}
     </div>

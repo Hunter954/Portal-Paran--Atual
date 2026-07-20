@@ -1160,7 +1160,7 @@ img{max-width:100%;display:block}
 .pa-section-head a{font-size:12px;color:var(--pa-blue);text-decoration:none;font-weight:900;}
 .pa-section-head a:hover{text-decoration:underline;}
 .pa-news-card--section .pa-news-card__img{height:160px;}
-.pa-news-card--section h3{font-size:15px;line-height:1.18;}
+.pa-news-card--section h3{font-size:14px;line-height:1.15;margin:0 0 8px;font-weight:900;letter-spacing:-.02em;}
 .pa-footer{margin-top:0;}
 .pa-footer-blue{background:var(--pa-blue);min-height:150px;display:flex;align-items:center;}
 .pa-footer-logo img{width:220px;height:auto;}

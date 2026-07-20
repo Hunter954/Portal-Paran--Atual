@@ -204,6 +204,8 @@ def inject_site_globals():
         "clean_text": _clean_text,
         "format_date_br": _format_date_br,
         "display_category_name": _display_category_name,
+        "display_post_title": _display_post_title,
+        "display_post_summary": _display_post_summary,
     }
 
 
@@ -253,6 +255,78 @@ def _display_category_name(value: str, max_len: int = 18) -> str:
     first = text.split()[0].strip()
     return first or text[:max_len].strip()
 
+
+
+def _normalized_text(value: str | None) -> str:
+    return _clean_text(value or "").casefold()
+
+
+
+def _post_category_names(post, fallback_category: str | None = None) -> list[str]:
+    names = []
+    for category in getattr(post, 'categories', []) or []:
+        if getattr(category, 'name', None):
+            names.append(category.name)
+    if fallback_category:
+        names.append(fallback_category)
+    unique = []
+    seen = set()
+    for name in names:
+        normalized = _normalized_text(name)
+        if not normalized or normalized in seen:
+            continue
+        unique.append(_clean_text(name))
+        seen.add(normalized)
+    return unique
+
+
+
+def _display_post_title(post, fallback_category: str | None = None, limit: int = 0) -> str:
+    raw_title = _clean_text(getattr(post, 'title', '') or '')
+    normalized_title = _normalized_text(raw_title)
+    category_names = _post_category_names(post, fallback_category)
+    normalized_categories = {_normalized_text(name) for name in category_names}
+
+    chosen = raw_title
+    title_matches_category = normalized_title and normalized_title in normalized_categories
+
+    if not chosen or title_matches_category:
+        for candidate in [getattr(post, 'excerpt', ''), getattr(post, 'content_html', '')]:
+            clean_candidate = _clean_text(candidate or '')
+            normalized_candidate = _normalized_text(clean_candidate)
+            if not clean_candidate:
+                continue
+            if normalized_candidate in normalized_categories:
+                continue
+            if normalized_candidate == normalized_title:
+                continue
+            chosen = clean_candidate
+            break
+
+    if not chosen:
+        chosen = category_names[0] if category_names else 'Notícias'
+
+    return _clean_text(chosen, limit)
+
+
+
+def _display_post_summary(post, fallback_category: str | None = None, limit: int = 0) -> str:
+    display_title = _display_post_title(post, fallback_category)
+    normalized_title = _normalized_text(display_title)
+    category_names = _post_category_names(post, fallback_category)
+    normalized_categories = {_normalized_text(name) for name in category_names}
+
+    for candidate in [getattr(post, 'excerpt', ''), getattr(post, 'content_html', '')]:
+        clean_candidate = _clean_text(candidate or '')
+        normalized_candidate = _normalized_text(clean_candidate)
+        if not clean_candidate:
+            continue
+        if normalized_candidate == normalized_title:
+            continue
+        if normalized_candidate in normalized_categories:
+            continue
+        return _clean_text(clean_candidate, limit)
+    return ''
 
 
 
