@@ -101,6 +101,17 @@ def _setting(key: str, default: str = "") -> str:
     return s.value if s and s.value is not None else default
 
 
+def _setting_json(key: str, default):
+    """Return a JSON setting, falling back safely when it is empty or invalid."""
+    raw = (_setting(key, "") or "").strip()
+    if not raw:
+        return default
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return default
+
+
 def _absolute_url(value: str) -> str:
     if not value:
         return ""
