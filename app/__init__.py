@@ -117,6 +117,7 @@ def _ensure_defaults():
         ("footer_copyright_text", "Todos os direitos reservados - Portal Paraná Atual"),
         ("site_keywords", "notícias, Paraná, Foz do Iguaçu, portal de notícias, atualidades"),
         ("top_menu_category_ids", "[]"),
+        ("ad_sidebar_order", "[\"sidebar_1\", \"header_top\", \"sidebar_2\"]"),
         ("hub_enabled", "0"),
         ("hub_site_key", ""),
         ("hub_receive_token", ""),

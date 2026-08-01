@@ -1,20 +1,20 @@
 {% extends 'admin/layout.html' %}
 {% block admin_title %}Publicidade{% endblock %}
 {% block page_title %}Editor visual de publicidade{% endblock %}
-{% block page_subtitle %}O portal possui três espaços de publicidade na lateral da home e das matérias internas.{% endblock %}
+{% block page_subtitle %}Gerencie os banners e altere a ordem em que aparecem na lateral da home e das matérias.{% endblock %}
 {% block admin_content %}
 <section class="panel-card ads-guide-card">
   <div class="ads-guide-grid">
-    <div><span class="ads-guide-step">1</span><strong>Escolha o espaço</strong><p>Clique exatamente no bloco que deseja alterar.</p></div>
-    <div><span class="ads-guide-step">2</span><strong>Envie a arte</strong><p>Use a medida mostrada para evitar cortes ou distorções.</p></div>
-    <div><span class="ads-guide-step">3</span><strong>Salve e confira</strong><p>O banner será exibido no mesmo local representado na prévia.</p></div>
+    <div><span class="ads-guide-step">1</span><strong>Arraste os espaços</strong><p>Segure pelo ícone e mova o banner para cima ou para baixo.</p></div>
+    <div><span class="ads-guide-step">2</span><strong>Confira a sequência</strong><p>O mapa mostra exatamente a ordem que será usada no site.</p></div>
+    <div><span class="ads-guide-step">3</span><strong>Salve a ordem</strong><p>A mudança será aplicada na home e nas páginas de matéria.</p></div>
   </div>
 </section>
 
-<section class="ads-visual-layout">
+<section class="ads-visual-layout" data-ads-order-editor data-save-url="{{ url_for('admin.ads_order_post') }}">
   <div class="panel-card ads-visual-canvas">
     <div class="ads-visual-topline">
-      <div><h2>Mapa real dos anúncios</h2><p>A prévia abaixo replica a página inicial do portal.</p></div>
+      <div><h2>Mapa real dos anúncios</h2><p>Arraste os blocos da lateral para definir a ordem de exibição.</p></div>
       <a class="btn btn-outline-dark" href="{{ url_for('site.home') }}" target="_blank" rel="noopener">Ver site real</a>
     </div>
 
@@ -32,28 +32,42 @@
           <strong class="ads-home-preview__section-title">CIDADE</strong>
           <div class="ads-home-preview__cards">{% for i in range(3) %}<div><span></span><small><b>CIDADE</b>Título da matéria publicado no portal</small></div>{% endfor %}</div>
         </div>
-        <div class="ads-home-preview__sidebar">
-          {% for key in ['sidebar_1', 'header_top', 'sidebar_2'] %}
-            {% for item in slot_cards if item.slot.key == key %}
-            <a class="ads-preview-slot ads-preview-slot--{{ item.shape }}" href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}">
+        <div class="ads-home-preview__sidebar ads-sortable" data-ads-sortable="preview">
+          {% for item in slot_cards %}
+          <div class="ads-preview-slot ads-preview-slot--{{ item.shape }} ads-sortable-item" draggable="true" data-slot-key="{{ item.slot.key }}">
+            <div class="ads-sortable-toolbar">
+              <button class="ads-drag-handle" type="button" title="Arraste para mudar a posição" aria-label="Arraste para mudar a posição"><i class="bi bi-grip-vertical"></i></button>
               <span class="ads-preview-badge">{{ item.label }}</span>
+              <div class="ads-order-actions">
+                <button type="button" data-move="up" title="Mover para cima"><i class="bi bi-arrow-up"></i></button>
+                <button type="button" data-move="down" title="Mover para baixo"><i class="bi bi-arrow-down"></i></button>
+              </div>
+            </div>
+            <a class="ads-preview-edit" href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}">
               <div class="ads-preview-art {% if item.cover_image %}has-image{% endif %}">{% if item.cover_image %}<img src="{{ item.cover_image }}" alt="{{ item.label }}">{% else %}<strong>{{ item.label }}</strong><small>{{ item.dimensions }}</small>{% endif %}</div>
               <div class="ads-preview-meta"><strong>{{ item.dimensions }}</strong><span>{{ item.banner_count }} banner(s)</span></div>
             </a>
-            {% endfor %}
+          </div>
           {% endfor %}
         </div>
       </div>
-
     </div>
   </div>
 
   <div class="panel-card ads-slot-list-card">
-    <div class="panel-head"><div><h2>Espaços disponíveis</h2><p>Somente os locais que realmente existem no site.</p></div></div>
-    <div class="ads-slot-list">
+    <div class="panel-head"><div><h2>Ordem dos espaços</h2><p>Esta lista acompanha a ordem definida no mapa.</p></div></div>
+    <div class="ads-slot-list ads-sortable" data-ads-sortable="list">
       {% for item in slot_cards %}
-      <a class="ads-slot-list-item" href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}"><div><strong>{{ item.label }}</strong><small>{{ item.hint }} • {{ item.dimensions }}</small></div><span>{{ item.banner_count }} banner(s)</span></a>
+      <div class="ads-slot-list-item ads-sortable-item" draggable="true" data-slot-key="{{ item.slot.key }}">
+        <button class="ads-drag-handle" type="button" title="Arraste para mudar a posição"><i class="bi bi-grip-vertical"></i></button>
+        <a href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}"><div><strong>{{ item.label }}</strong><small>{{ item.hint }} • {{ item.dimensions }}</small></div></a>
+        <span>{{ item.banner_count }} banner(s)</span>
+      </div>
       {% endfor %}
+    </div>
+    <div class="ads-order-footer">
+      <div class="ads-order-status" data-ads-order-status>Arraste os espaços e clique em salvar.</div>
+      <button class="btn btn-dark" type="button" data-save-ads-order disabled><i class="bi bi-check2-circle me-1"></i>Salvar ordem</button>
     </div>
   </div>
 </section>

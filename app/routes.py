@@ -86,6 +86,37 @@ def _render_ad_from_payload(slot_key: str, payload: dict) -> str:
     return f'<div class="ad-rotator {wrapper_class}" id="ad-rotator-{slot_id}">{"".join(slides_html)}{controls}</div>{script}'
 
 
+AD_SIDEBAR_KEYS = ('sidebar_1', 'header_top', 'sidebar_2')
+AD_SIDEBAR_WRAPPERS = {
+    'sidebar_1': 'pa-ad pa-ad--green pa-ad--square',
+    'header_top': 'pa-ad pa-ad--blue pa-ad--landscape',
+    'sidebar_2': 'pa-ad pa-ad--green pa-ad--tall',
+}
+
+
+def _ad_sidebar_order() -> list[str]:
+    raw = _setting_json('ad_sidebar_order', list(AD_SIDEBAR_KEYS))
+    if not isinstance(raw, list):
+        raw = []
+    clean = []
+    for key in raw:
+        if key in AD_SIDEBAR_KEYS and key not in clean:
+            clean.append(key)
+    clean.extend(key for key in AD_SIDEBAR_KEYS if key not in clean)
+    return clean
+
+
+def _ad_sidebar_items() -> list[dict]:
+    return [
+        {
+            'key': key,
+            'html': _get_ad(key),
+            'wrapper_class': AD_SIDEBAR_WRAPPERS[key],
+        }
+        for key in _ad_sidebar_order()
+    ]
+
+
 def _get_ad(key: str) -> str:
     slot = AdSlot.query.filter_by(key=key, is_active=True).first()
     if not slot or not slot.html:
@@ -668,6 +699,7 @@ def home():
         ad_home_bottom=_get_ad("home_bottom"),
         ad_sidebar_1=_get_ad("sidebar_1"),
         ad_sidebar_2=_get_ad("sidebar_2"),
+        ad_sidebar_items=_ad_sidebar_items(),
     )
 
 
@@ -728,6 +760,7 @@ def post(slug):
         ad_article_end=_get_ad("home_mid"),
         ad_sidebar_1=_get_ad("sidebar_1"),
         ad_sidebar_2=_get_ad("sidebar_2"),
+        ad_sidebar_items=_ad_sidebar_items(),
     )
 
 

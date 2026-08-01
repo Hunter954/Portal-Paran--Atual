@@ -33,9 +33,9 @@
   </div>
 
   <aside class="pa-home-sidebar">
-    <div class="pa-ad pa-ad--green pa-ad--square">{% if ad_sidebar_1 %}{{ ad_sidebar_1|safe }}{% endif %}</div>
-    <div class="pa-ad pa-ad--blue pa-ad--landscape">{% if ad_header %}{{ ad_header|safe }}{% endif %}</div>
-    <div class="pa-ad pa-ad--green pa-ad--tall">{% if ad_sidebar_2 %}{{ ad_sidebar_2|safe }}{% endif %}</div>
+    {% for ad_item in ad_sidebar_items %}
+    <div class="{{ ad_item.wrapper_class }}" data-ad-slot="{{ ad_item.key }}">{% if ad_item.html %}{{ ad_item.html|safe }}{% endif %}</div>
+    {% endfor %}
   </aside>
 </section>
 

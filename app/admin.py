@@ -8,7 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 from urllib.parse import urlparse
 
-from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app, abort
+from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app, abort, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy import func, desc, or_
 from werkzeug.utils import secure_filename
@@ -115,6 +115,21 @@ def _parse_ad_slot_payload(raw: str | None) -> dict | None:
     except Exception:
         return None
     return None
+
+
+AD_SIDEBAR_KEYS = ('sidebar_1', 'header_top', 'sidebar_2')
+
+
+def _ad_sidebar_order() -> list[str]:
+    raw = _setting_json('ad_sidebar_order', list(AD_SIDEBAR_KEYS))
+    if not isinstance(raw, list):
+        raw = []
+    clean = []
+    for key in raw:
+        if key in AD_SIDEBAR_KEYS and key not in clean:
+            clean.append(key)
+    clean.extend(key for key in AD_SIDEBAR_KEYS if key not in clean)
+    return clean
 
 
 def _default_slot_layout_meta() -> dict:
@@ -1500,12 +1515,42 @@ def ads_editor():
     r = _require_admin()
     if r:
         return r
-    allowed_keys = ('sidebar_1', 'header_top', 'sidebar_2')
+    allowed_keys = AD_SIDEBAR_KEYS
+    sidebar_order = _ad_sidebar_order()
     slots = AdSlot.query.filter(AdSlot.key.in_(allowed_keys)).all()
-    order = {key: index for index, key in enumerate(allowed_keys)}
+    order = {key: index for index, key in enumerate(sidebar_order)}
     slots.sort(key=lambda item: order.get(item.key, 999))
     slot_cards = [_slot_card_data(slot) for slot in slots]
-    return render_template("admin/ads_editor.html", slot_cards=slot_cards, **_common_admin_context("ads"))
+    return render_template(
+        "admin/ads_editor.html",
+        slot_cards=slot_cards,
+        sidebar_order=sidebar_order,
+        **_common_admin_context("ads"),
+    )
+
+
+@admin_bp.post("/ads/order")
+@login_required
+def ads_order_post():
+    r = _require_admin()
+    if r:
+        return jsonify({'ok': False, 'message': 'Acesso negado.'}), 403
+
+    data = request.get_json(silent=True) or {}
+    requested_order = data.get('order')
+    if not isinstance(requested_order, list):
+        return jsonify({'ok': False, 'message': 'Ordem inválida.'}), 400
+
+    clean_order = []
+    for key in requested_order:
+        if key in AD_SIDEBAR_KEYS and key not in clean_order:
+            clean_order.append(key)
+    if set(clean_order) != set(AD_SIDEBAR_KEYS):
+        return jsonify({'ok': False, 'message': 'A ordem precisa conter os três espaços de publicidade.'}), 400
+
+    _save_setting('ad_sidebar_order', json.dumps(clean_order, ensure_ascii=False))
+    db.session.commit()
+    return jsonify({'ok': True, 'order': clean_order, 'message': 'Ordem salva e aplicada no site.'})
 
 
 @admin_bp.get("/ads/<int:slot_id>/manage")

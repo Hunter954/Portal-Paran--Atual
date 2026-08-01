@@ -270,3 +270,23 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFo
 .ads-home-preview__sidebar .ads-preview-art strong{font-size:12px;text-align:center}
 .ads-home-preview__sidebar .ads-preview-art small{font-size:9px}
 @media(max-width:700px){.ads-home-preview{grid-template-columns:1fr}.ads-home-preview__sidebar{display:grid;grid-template-columns:repeat(2,1fr)}.ads-home-preview__cards{grid-template-columns:repeat(2,1fr)}}
+
+/* Ordenação dinâmica dos espaços de publicidade */
+.ads-sortable-item{cursor:grab;user-select:none}
+.ads-sortable-item:active{cursor:grabbing}
+.ads-sortable-item.is-dragging{opacity:.45;transform:scale(.985)}
+.ads-sortable-item.is-drag-over{outline:3px solid rgba(23,56,135,.22);outline-offset:3px}
+.ads-sortable-toolbar{display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.ads-sortable-toolbar .ads-preview-badge{margin:0;flex:1}
+.ads-drag-handle,.ads-order-actions button{border:0;background:#eef2ff;color:#173887;border-radius:8px;width:28px;height:28px;display:inline-grid;place-items:center;padding:0}
+.ads-drag-handle{cursor:grab;font-size:16px}
+.ads-order-actions{display:flex;gap:4px}
+.ads-preview-edit{display:block;color:inherit;text-decoration:none}
+.ads-slot-list-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto}
+.ads-slot-list-item>a{color:inherit;text-decoration:none;min-width:0}
+.ads-order-footer{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:18px;padding-top:18px;border-top:1px solid var(--admin-line)}
+.ads-order-status{font-size:13px;color:var(--admin-muted)}
+.ads-order-status.is-dirty{color:#9a6700;font-weight:700}
+.ads-order-status.is-success{color:#15803d;font-weight:700}
+.ads-order-status.is-error{color:#b91c1c;font-weight:700}
+@media(max-width:700px){.ads-order-footer{align-items:stretch;flex-direction:column}.ads-order-footer .btn{width:100%}.ads-home-preview__sidebar{grid-template-columns:1fr!important}}
