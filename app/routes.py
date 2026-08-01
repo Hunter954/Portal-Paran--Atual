@@ -9,6 +9,7 @@ from sqlalchemy import desc, func, or_
 
 from .models import db, Post, Category, AdSlot, SiteSetting, PageView, AnalyticsSession
 from .sync import download_external_image
+from .timezone_utils import format_datetime_br, iso_brasilia
 
 site_bp = Blueprint("site", __name__)
 
@@ -234,6 +235,7 @@ def inject_site_globals():
         "ad_home_bottom": _get_ad("home_bottom"),
         "clean_text": _clean_text,
         "format_date_br": _format_date_br,
+        "format_datetime_br": format_datetime_br,
         "display_category_name": _display_category_name,
         "display_post_title": _display_post_title,
         "display_post_summary": _display_post_summary,
@@ -502,6 +504,8 @@ def hub_posts_upsert_api():
     post.excerpt = post_data.get('excerpt') or ''
     post.content_html = post_data.get('content_html') or ''
     post.author_name = (post_data.get('author_name') or '').strip() or 'Redação'
+    post.image_description = (post_data.get('image_description') or '').strip() or None
+    post.image_credit = (post_data.get('image_credit') or '').strip() or None
     post.published_at = _parse_iso_datetime(post_data.get('published_at')) or post.published_at or datetime.utcnow()
     post.updated_at = _parse_iso_datetime(post_data.get('updated_at')) or datetime.utcnow()
     post.source = 'hub'
@@ -745,8 +749,8 @@ def post(slug):
         "meta_image": _absolute_url(post.featured_image or _setting("default_share_image", _setting("logo_url", ""))),
         "meta_url": url_for("site.post", slug=post.slug, _external=True),
         "meta_type": "article",
-        "article_published_time": post.published_at.isoformat() if post.published_at else "",
-        "article_modified_time": (post.updated_at or post.published_at).isoformat() if (post.updated_at or post.published_at) else "",
+        "article_published_time": iso_brasilia(post.published_at),
+        "article_modified_time": iso_brasilia(post.updated_at or post.published_at),
     })
 
     return render_template(

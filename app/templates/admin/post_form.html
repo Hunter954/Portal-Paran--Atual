@@ -52,7 +52,7 @@
       </div>
       <div class="preview-box" style="padding:14px 16px;">
         <div class="small text-muted mb-1">Data da publicação</div>
-        <div><strong>{% if post and post.published_at %}{{ post.published_at.strftime('%d/%m/%Y %H:%M') }}{% else %}Automática no momento da publicação{% endif %}</strong></div>
+        <div><strong>{% if post and post.published_at %}{{ format_datetime_br(post.published_at, '%d/%m/%Y %H:%M') }}{% else %}Automática no momento da publicação{% endif %}</strong></div>
       </div>
       <div class="preview-box" style="padding:14px 16px;">
         <div class="small text-muted mb-1">Status atual</div>
@@ -61,6 +61,8 @@
       <div><label class="form-label">Categorias</label>{{ form.categories(class='form-select', multiple=true, size='8') }}</div>
       <div><label class="form-label">Imagem por link</label>{{ form.featured_image(class='form-control', placeholder='https://.../imagem.jpg') }}</div>
       <div><label class="form-label">ou enviar arquivo</label>{{ form.featured_image_file(class='form-control') }}</div>
+      <div><label class="form-label">Descrição da imagem</label>{{ form.image_description(class='form-control', placeholder='Ex.: Vista aérea do centro de Curitiba durante a manhã') }}<div class="form-help mt-1">Usada abaixo da foto e também como texto alternativo para acessibilidade.</div></div>
+      <div><label class="form-label">Créditos da foto</label>{{ form.image_credit(class='form-control', placeholder='Ex.: José Silva / Agência Paraná') }}<div class="form-help mt-1">Quando vazio, será exibido “Divulgação”.</div></div>
       {% if post and post.featured_image %}
       <div class="preview-box">
         <div class="small text-muted mb-2">Imagem atual</div>

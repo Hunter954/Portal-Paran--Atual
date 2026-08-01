@@ -10,7 +10,7 @@
       <div class="pa-author-avatar"><i class="bi bi-person-fill"></i></div>
       <div>
         <div>Por <strong>{{ post.author_name or 'REDAÇÃO' }}</strong></div>
-        {% if post.published_at %}<div>{{ post.published_at.strftime('%d/%m/%Y') }} &nbsp;|&nbsp; Atualizado em {{ (post.updated_at or post.published_at).strftime('%d/%m/%Y - %Hh%M') }}</div>{% endif %}
+        {% if post.published_at %}<div>Publicado em {{ format_datetime_br(post.published_at) }}{% if post.updated_at and post.updated_at != post.published_at %} &nbsp;|&nbsp; Atualizado em {{ format_datetime_br(post.updated_at) }}{% endif %}</div>{% endif %}
       </div>
     </div>
 
@@ -22,8 +22,8 @@
 
     {% if post.featured_image %}
       <figure class="pa-article-figure">
-        <img src="{{ post.featured_image }}" alt="{{ post.title|striptags }}">
-        <figcaption>Foto: Divulgação</figcaption>
+        <img src="{{ post.featured_image }}" alt="{{ post.image_description or post.title|striptags }}">
+        <figcaption>{% if post.image_description %}<span>{{ post.image_description }}</span>{% endif %}{% if post.image_description and post.image_credit %} <span aria-hidden="true">—</span> {% endif %}<span>Foto: {{ post.image_credit or 'Divulgação' }}</span></figcaption>
       </figure>
     {% endif %}
 

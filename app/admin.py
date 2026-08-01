@@ -18,6 +18,7 @@ from .sync import download_external_image
 from .forms import LoginForm, AdSlotForm, CategoryForm, PostAdminForm
 from .wp_client import WPClient
 from .sync import sync_categories, sync_posts, localize_existing_wp_images
+from .timezone_utils import format_datetime_br
 from html import unescape
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -289,6 +290,8 @@ def _serialize_post_for_hub(post: Post) -> dict:
             'excerpt': post.excerpt or '',
             'content_html': post.content_html or '',
             'featured_image': _absolute_media_url(post.featured_image or ''),
+            'image_description': post.image_description or '',
+            'image_credit': post.image_credit or '',
             'author_name': post.author_name or 'Anônimo',
             'published_at': post.published_at.isoformat() if post.published_at else '',
             'updated_at': (post.updated_at or datetime.utcnow()).isoformat(),
@@ -696,6 +699,8 @@ def _fill_post_form_from_obj(form: PostAdminForm, post: Post):
     form.excerpt.data = post.excerpt
     form.content_html.data = post.content_html
     form.featured_image.data = post.featured_image
+    form.image_description.data = post.image_description
+    form.image_credit.data = post.image_credit
     form.categories.data = [c.id for c in post.categories]
 
 
@@ -743,6 +748,8 @@ def posts_new():
             excerpt=(form.excerpt.data or '').strip() or None,
             content_html=(form.content_html.data or '').strip() or None,
             featured_image=image_url or None,
+            image_description=(form.image_description.data or '').strip() or None,
+            image_credit=(form.image_credit.data or '').strip() or None,
             author_name='Anônimo',
             updated_at=datetime.utcnow(),
         )
@@ -781,10 +788,16 @@ def posts_edit(post_id):
         post.excerpt = (form.excerpt.data or '').strip() or None
         post.content_html = (form.content_html.data or '').strip() or None
         post.featured_image = image_url or None
+        post.image_description = (form.image_description.data or '').strip() or None
+        post.image_credit = (form.image_credit.data or '').strip() or None
         post.author_name = 'Anônimo'
         post.updated_at = datetime.utcnow()
         action = (request.form.get('post_action') or 'publish').strip().lower()
-        post.published_at = datetime.utcnow() if action == 'publish' else None
+        if action == 'publish':
+            if not post.published_at:
+                post.published_at = datetime.utcnow()
+        else:
+            post.published_at = None
         selected_ids = form.categories.data or []
         post.categories = Category.query.filter(Category.id.in_(selected_ids)).all() if selected_ids else []
         db.session.commit()
@@ -843,7 +856,10 @@ def _wp_stats():
 
 @admin_bp.app_context_processor
 def inject_admin_helpers():
-    return {"admin_media_root": current_app.config.get("MEDIA_ROOT", "/data/uploads")}
+    return {
+        "admin_media_root": current_app.config.get("MEDIA_ROOT", "/data/uploads"),
+        "format_datetime_br": format_datetime_br,
+    }
 
 
 @admin_bp.get("/login")
@@ -1146,6 +1162,8 @@ def importar_parana_atual():
                         post.excerpt = (data.get('excerpt') or '').strip() or None
                         post.content_html = (data.get('content_html') or '').strip() or None
                         post.featured_image = image_local or post.featured_image or data.get('image_url') or None
+                        post.image_description = (data.get('image_description') or '').strip() or post.image_description
+                        post.image_credit = (data.get('image_credit') or '').strip() or post.image_credit
                         post.author_name = (data.get('author_name') or 'Portal Paraná Atual').strip()
                         post.published_at = data.get('published_at') or post.published_at or datetime.utcnow()
                         post.updated_at = datetime.utcnow()

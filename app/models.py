@@ -45,6 +45,8 @@ class Post(db.Model):
     content_html = db.Column(db.Text, nullable=True)
 
     featured_image = db.Column(db.String(800), nullable=True)
+    image_description = db.Column(db.String(500), nullable=True)
+    image_credit = db.Column(db.String(255), nullable=True)
     author_name = db.Column(db.String(190), nullable=True)
 
     published_at = db.Column(db.DateTime, index=True, nullable=True)
