@@ -127,9 +127,9 @@ def _default_slot_layout_meta() -> dict:
         },
         'header_top': {
             'label': 'Publicidade lateral 2',
-            'hint': 'Segundo banner da coluna lateral',
+            'hint': 'Banner horizontal da coluna lateral, ajustado para a nova publicidade',
             'shape': 'rectangle',
-            'dimensions': '300 × 200 px',
+            'dimensions': '460 × 320 px',
         },
         'sidebar_2': {
             'label': 'Publicidade lateral 3',

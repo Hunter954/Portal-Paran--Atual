@@ -27,7 +27,7 @@ def _parse_ad_payload(raw: str | None) -> dict | None:
 
 
 AD_SLOT_CLASSNAMES = {
-    "header_top": "ad-slot-banner ad-slot-banner--wide",
+    "header_top": "ad-slot-banner ad-slot-banner--landscape",
     "home_top": "ad-slot-banner ad-slot-banner--wide",
     "home_mid": "ad-slot-banner ad-slot-banner--wide",
     "home_bottom": "ad-slot-banner ad-slot-banner--wide",

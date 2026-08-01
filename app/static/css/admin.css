@@ -237,7 +237,7 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFo
 
 
 /* Mapa fiel dos únicos espaços publicitários do portal */
-.ads-preview-slot--rectangle .ads-preview-art{aspect-ratio:300/200}
+.ads-preview-slot--rectangle .ads-preview-art{aspect-ratio:460/320}
 .ads-category-preview{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:16px;padding:16px;background:#fff}
 .ads-category-preview__title{display:block;color:#173887;font-size:18px;margin:4px 0 12px}
 .ads-category-preview__cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 8px}
