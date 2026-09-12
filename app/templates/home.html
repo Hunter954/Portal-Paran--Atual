@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 {% set hero = lead_post %}
-{% set hero_cards = latest_queue[:3] %}
+{% set hero_cards = latest_queue[:6] %}
 
 <section class="pa-home-grid">
   <div class="pa-home-left">
@@ -18,27 +18,28 @@
     </a>
     {% endif %}
 
-    <div class="pa-card-row pa-card-row--top">
-      {% for p in hero_cards %}
-      {% set card_title = display_post_title(p, limit=72) %}
-      {% set card_summary = display_post_summary(p, limit=120) %}
-      <a class="pa-news-card" href="{{ url_for('site.post', slug=p.slug) }}">
-        <div class="pa-news-card__img" style="background-image:url('{{ p.featured_image or '' }}')"></div>
-        <span class="pa-category-tag">{{ (p.categories[0].name if p.categories else 'NOTÍCIAS')|upper }}</span>
-        <h3>{{ card_title }}</h3>
-        {% if card_summary %}<p>{{ card_summary }}</p>{% endif %}
-      </a>
+    <div class="pa-home-news-rows">
+      {% for row_start in range(0, hero_cards|length, 3) %}
+      <div class="pa-card-row pa-card-row--top{% if row_start > 0 %} pa-card-row--second{% endif %}">
+        {% for p in hero_cards[row_start:row_start + 3] %}
+        {% set card_title = display_post_title(p, limit=72) %}
+        {% set card_summary = display_post_summary(p, limit=120) %}
+        <a class="pa-news-card" href="{{ url_for('site.post', slug=p.slug) }}">
+          <div class="pa-news-card__img" style="background-image:url('{{ p.featured_image or '' }}')"></div>
+          <span class="pa-category-tag">{{ (p.categories[0].name if p.categories else 'NOTÍCIAS')|upper }}</span>
+          <h3>{{ card_title }}</h3>
+          {% if card_summary %}<p>{{ card_summary }}</p>{% endif %}
+        </a>
+        {% endfor %}
+      </div>
       {% endfor %}
-    </div>
-
-    <div class="pa-home-inline-ads" aria-label="Publicidade">
-      <div class="pa-ad pa-ad--landscape" data-ad-slot="header_top">{% if ad_header %}{{ ad_header|safe }}{% endif %}</div>
-      <div class="pa-ad pa-ad--square" data-ad-slot="sidebar_1">{% if ad_sidebar_1 %}{{ ad_sidebar_1|safe }}{% endif %}</div>
     </div>
   </div>
 
-  <aside class="pa-home-sidebar">
-    <div class="pa-ad pa-ad--green pa-ad--portrait" data-ad-slot="sidebar_2">{% if ad_sidebar_2 %}{{ ad_sidebar_2|safe }}{% endif %}</div>
+  <aside class="pa-home-sidebar" aria-label="Publicidade">
+    {% for ad_item in ad_sidebar_items %}
+    <div class="{{ ad_item.wrapper_class }}" data-ad-slot="{{ ad_item.key }}">{% if ad_item.html %}{{ ad_item.html|safe }}{% endif %}</div>
+    {% endfor %}
   </aside>
 </section>
 

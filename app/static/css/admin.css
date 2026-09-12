@@ -301,3 +301,13 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFo
 .ads-home-preview__sidebar .ads-preview-slot--portrait{max-width:180px;width:100%;margin:0 auto;}
 .ads-home-preview__position-note{margin-top:8px;font-size:10px;line-height:1.35;color:#64748b;font-weight:700;}
 @media(max-width:700px){.ads-home-preview__inline-ads{grid-template-columns:1fr}.ads-home-preview__inline-ads .ads-preview-slot{max-width:300px;margin:auto}}
+
+
+/* Prévia do novo layout: todos os formatos na coluna direita, mesma largura. */
+.ads-home-preview__cards--second{margin-top:12px;}
+.ads-home-preview__sidebar .ads-preview-slot--square,
+.ads-home-preview__sidebar .ads-preview-slot--rectangle,
+.ads-home-preview__sidebar .ads-preview-slot--portrait{width:100%;max-width:none;margin:0;}
+.ads-home-preview__sidebar .ads-preview-slot--square .ads-preview-art{aspect-ratio:1/1;}
+.ads-home-preview__sidebar .ads-preview-slot--rectangle .ads-preview-art{aspect-ratio:460/320;}
+.ads-home-preview__sidebar .ads-preview-slot--portrait .ads-preview-art{aspect-ratio:1/2;}

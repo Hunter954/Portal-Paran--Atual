@@ -5,9 +5,9 @@
 {% block admin_content %}
 <section class="panel-card ads-guide-card">
   <div class="ads-guide-grid">
-    <div><span class="ads-guide-step">1</span><strong>460 × 320</strong><p>Na home aparece abaixo das três matérias. Na matéria aparece na coluna direita.</p></div>
-    <div><span class="ads-guide-step">2</span><strong>320 × 320</strong><p>Na home fica ao lado do 460 × 320. Na matéria aparece na coluna direita.</p></div>
-    <div><span class="ads-guide-step">3</span><strong>300 × 600</strong><p>É o banner vertical da coluna direita, tanto na home quanto na página da matéria.</p></div>
+    <div><span class="ads-guide-step">1</span><strong>460 × 320</strong><p>Coluna direita, com a mesma largura visual dos demais e altura proporcional.</p></div>
+    <div><span class="ads-guide-step">2</span><strong>320 × 320</strong><p>Coluna direita, mantendo o formato quadrado e a arte inteira.</p></div>
+    <div><span class="ads-guide-step">3</span><strong>300 × 600</strong><p>Coluna direita, mantendo o formato vertical e a arte inteira.</p></div>
   </div>
 </section>
 
@@ -36,33 +36,22 @@
         <div class="ads-home-preview__content">
           <div class="ads-home-preview__hero"><span></span><strong>Manchete principal publicada no portal</strong></div>
           <div class="ads-home-preview__cards">{% for i in range(3) %}<div><span></span><small><b>NOTÍCIAS</b>Título da matéria publicado no portal</small></div>{% endfor %}</div>
-
-          <div class="ads-home-preview__inline-ads">
-            {% for item in [ns.rectangle, ns.square] if item %}
-            <div class="ads-preview-slot ads-preview-slot--{{ item.shape }}">
-              <span class="ads-preview-badge">{{ item.label }}</span>
-              <a class="ads-preview-edit" href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}">
-                <div class="ads-preview-art {% if item.cover_image %}has-image{% endif %}">{% if item.cover_image %}<img src="{{ item.cover_image }}" alt="{{ item.label }}">{% else %}<strong>{{ item.dimensions }}</strong><small>Clique para configurar</small>{% endif %}</div>
-                <div class="ads-preview-meta"><strong>{{ item.dimensions }}</strong><span>{{ item.banner_count }} banner(s)</span></div>
-              </a>
-            </div>
-            {% endfor %}
-          </div>
+          <div class="ads-home-preview__cards ads-home-preview__cards--second">{% for i in range(3) %}<div><span></span><small><b>NOTÍCIAS</b>Segunda linha de matérias</small></div>{% endfor %}</div>
 
           <strong class="ads-home-preview__section-title">INÍCIO DAS CATEGORIAS</strong>
           <div class="ads-home-preview__cards">{% for i in range(3) %}<div><span></span><small><b>CIDADE</b>Matéria da categoria</small></div>{% endfor %}</div>
         </div>
 
         <div class="ads-home-preview__sidebar">
-          {% if ns.portrait %}
-          <div class="ads-preview-slot ads-preview-slot--portrait">
-            <span class="ads-preview-badge">{{ ns.portrait.label }}</span>
-            <a class="ads-preview-edit" href="{{ url_for('admin.ads_manage', slot_id=ns.portrait.slot.id) }}">
-              <div class="ads-preview-art {% if ns.portrait.cover_image %}has-image{% endif %}">{% if ns.portrait.cover_image %}<img src="{{ ns.portrait.cover_image }}" alt="{{ ns.portrait.label }}">{% else %}<strong>{{ ns.portrait.dimensions }}</strong><small>Clique para configurar</small>{% endif %}</div>
-              <div class="ads-preview-meta"><strong>{{ ns.portrait.dimensions }}</strong><span>{{ ns.portrait.banner_count }} banner(s)</span></div>
+          {% for item in [ns.square, ns.rectangle, ns.portrait] if item %}
+          <div class="ads-preview-slot ads-preview-slot--{{ item.shape }}">
+            <span class="ads-preview-badge">{{ item.label }}</span>
+            <a class="ads-preview-edit" href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}">
+              <div class="ads-preview-art {% if item.cover_image %}has-image{% endif %}">{% if item.cover_image %}<img src="{{ item.cover_image }}" alt="{{ item.label }}">{% else %}<strong>{{ item.dimensions }}</strong><small>Clique para configurar</small>{% endif %}</div>
+              <div class="ads-preview-meta"><strong>{{ item.dimensions }}</strong><span>{{ item.banner_count }} banner(s)</span></div>
             </a>
           </div>
-          {% endif %}
+          {% endfor %}
         </div>
       </div>
     </div>

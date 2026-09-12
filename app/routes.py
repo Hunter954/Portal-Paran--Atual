@@ -585,7 +585,7 @@ def home():
                          .limit(60).all())
     latest = _unique_posts(latest_candidates, limit=24)
     lead_post = latest[0] if latest else None
-    latest_queue = latest[1:4] if len(latest) > 1 else []
+    latest_queue = latest[1:7] if len(latest) > 1 else []
     excluded_ids = {p.id for p in [lead_post, *latest_queue] if p}
 
     def cat_posts(slug, limit=6, exclude_ids=None):
