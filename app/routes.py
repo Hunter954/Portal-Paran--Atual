@@ -33,7 +33,7 @@ AD_SLOT_CLASSNAMES = {
     "home_mid": "ad-slot-banner ad-slot-banner--wide",
     "home_bottom": "ad-slot-banner ad-slot-banner--wide",
     "sidebar_1": "ad-slot-banner ad-slot-banner--square",
-    "sidebar_2": "ad-slot-banner ad-slot-banner--square",
+    "sidebar_2": "ad-slot-banner ad-slot-banner--portrait",
 }
 
 
@@ -91,7 +91,7 @@ AD_SIDEBAR_KEYS = ('sidebar_1', 'header_top', 'sidebar_2')
 AD_SIDEBAR_WRAPPERS = {
     'sidebar_1': 'pa-ad pa-ad--green pa-ad--square',
     'header_top': 'pa-ad pa-ad--blue pa-ad--landscape',
-    'sidebar_2': 'pa-ad pa-ad--green pa-ad--tall',
+    'sidebar_2': 'pa-ad pa-ad--green pa-ad--portrait',
 }
 
 

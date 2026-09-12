@@ -83,12 +83,12 @@ def _ensure_schema_updates():
 
 def _ensure_defaults():
     defaults = [
-        ("header_top", "Publicidade (Topo - faixa)"),
+        ("header_top", "Publicidade 460x320"),
         ("home_top", "Publicidade (Home - faixa no meio)"),
         ("home_mid", "Publicidade (Final da matéria)"),
         ("home_bottom", "Publicidade (Home - faixa inferior)"),
-        ("sidebar_1", "Publicidade (Sidebar 1)"),
-        ("sidebar_2", "Publicidade (Sidebar 2)"),
+        ("sidebar_1", "Publicidade 320x320"),
+        ("sidebar_2", "Publicidade 300x600"),
     ]
     for key, name in defaults:
         if not AdSlot.query.filter_by(key=key).first():

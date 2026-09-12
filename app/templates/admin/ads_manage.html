@@ -46,7 +46,7 @@
     </div>
 
     <div class="ads-manage-note">
-      <i class="bi bi-info-circle"></i> Pode deixar mais de um banner nesse mesmo local. O sistema faz a rotação automaticamente no site e a arte ideal para esse espaço é <strong>{{ slot_data.dimensions }}</strong>.
+      <i class="bi bi-info-circle"></i> Pode deixar mais de um banner nesse mesmo local. O sistema faz a rotação automaticamente e exibe a arte inteira, sem cortar. A medida ideal para esse espaço é <strong>{{ slot_data.dimensions }}</strong>.
     </div>
 
     <div class="ads-banner-list" data-banner-list>
@@ -96,7 +96,7 @@
 
   <aside class="panel-card ads-manage-preview">
     <div class="panel-head">
-      <div><h2>Prévia rápida</h2><p>Referência visual do formato desse espaço.</p></div>
+      <div><h2>Prévia rápida</h2><p>Referência visual do formato desse espaço, sem recorte da arte.</p></div>
     </div>
     <div class="ads-preview-slot ads-preview-slot--{{ slot_data.shape }} is-static">
       <span class="ads-preview-badge">{{ slot_data.label }}</span>
@@ -121,7 +121,7 @@
       <div class="col-lg-4">
         <label class="form-label">Enviar imagem</label>
         <input class="form-control" type="file" name="banner_image[]" accept=".jpg,.jpeg,.png,.webp,.gif,.svg">
-        <div class="form-text">Envie a arte desse banner.</div>
+        <div class="form-text">Medida recomendada: {{ slot_data.dimensions }}. A imagem será exibida inteira, sem corte.</div>
       </div>
       <div class="col-lg-4">
         <label class="form-label">Título interno</label>

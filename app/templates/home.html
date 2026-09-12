@@ -30,12 +30,15 @@
       </a>
       {% endfor %}
     </div>
+
+    <div class="pa-home-inline-ads" aria-label="Publicidade">
+      <div class="pa-ad pa-ad--landscape" data-ad-slot="header_top">{% if ad_header %}{{ ad_header|safe }}{% endif %}</div>
+      <div class="pa-ad pa-ad--square" data-ad-slot="sidebar_1">{% if ad_sidebar_1 %}{{ ad_sidebar_1|safe }}{% endif %}</div>
+    </div>
   </div>
 
   <aside class="pa-home-sidebar">
-    {% for ad_item in ad_sidebar_items %}
-    <div class="{{ ad_item.wrapper_class }}" data-ad-slot="{{ ad_item.key }}">{% if ad_item.html %}{{ ad_item.html|safe }}{% endif %}</div>
-    {% endfor %}
+    <div class="pa-ad pa-ad--green pa-ad--portrait" data-ad-slot="sidebar_2">{% if ad_sidebar_2 %}{{ ad_sidebar_2|safe }}{% endif %}</div>
   </aside>
 </section>
 

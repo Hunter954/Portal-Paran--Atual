@@ -136,22 +136,22 @@ def _ad_sidebar_order() -> list[str]:
 def _default_slot_layout_meta() -> dict:
     return {
         'sidebar_1': {
-            'label': 'Publicidade lateral 1',
-            'hint': 'Primeiro banner quadrado da coluna lateral',
+            'label': 'Banner 320 × 320',
+            'hint': 'Na home fica abaixo das 3 matérias; nas matérias fica na coluna direita',
             'shape': 'square',
-            'dimensions': '300 × 300 px',
+            'dimensions': '320 × 320 px',
         },
         'header_top': {
-            'label': 'Publicidade lateral 2',
-            'hint': 'Banner horizontal da coluna lateral, ajustado para a nova publicidade',
+            'label': 'Banner 460 × 320',
+            'hint': 'Na home fica abaixo das 3 matérias; nas matérias fica na coluna direita',
             'shape': 'rectangle',
             'dimensions': '460 × 320 px',
         },
         'sidebar_2': {
-            'label': 'Publicidade lateral 3',
-            'hint': 'Terceiro banner vertical da coluna lateral',
-            'shape': 'tall',
-            'dimensions': '300 × 400 px',
+            'label': 'Banner 300 × 600',
+            'hint': 'Banner vertical fixo da coluna direita na home e nas matérias',
+            'shape': 'portrait',
+            'dimensions': '300 × 600 px',
         },
     }
 
