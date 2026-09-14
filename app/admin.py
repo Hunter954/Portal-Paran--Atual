@@ -137,19 +137,19 @@ def _default_slot_layout_meta() -> dict:
     return {
         'sidebar_1': {
             'label': 'Banner 320 × 320',
-            'hint': 'Na home fica abaixo das 3 matérias; nas matérias fica na coluna direita',
+            'hint': 'Coluna direita, na ordem definida no editor de publicidade',
             'shape': 'square',
             'dimensions': '320 × 320 px',
         },
         'header_top': {
             'label': 'Banner 460 × 320',
-            'hint': 'Na home fica abaixo das 3 matérias; nas matérias fica na coluna direita',
+            'hint': 'Coluna direita, na ordem definida no editor de publicidade',
             'shape': 'rectangle',
             'dimensions': '460 × 320 px',
         },
         'sidebar_2': {
             'label': 'Banner 300 × 600',
-            'hint': 'Banner vertical fixo da coluna direita na home e nas matérias',
+            'hint': 'Banner vertical da coluna direita, na ordem definida no editor',
             'shape': 'portrait',
             'dimensions': '300 × 600 px',
         },

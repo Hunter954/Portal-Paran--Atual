@@ -30,6 +30,7 @@
   const saveUrl = editor.dataset.saveUrl;
   let draggedKey = null;
   let dirty = false;
+  let saving = false;
 
   const currentOrder = () => [...preview.querySelectorAll('[data-slot-key]')].map(item => item.dataset.slotKey);
 
@@ -44,7 +45,7 @@
 
   const markDirty = () => {
     dirty = true;
-    saveButton.disabled = false;
+    saveButton.disabled = saving;
     status.textContent = 'Ordem alterada. Clique em salvar para aplicar no site.';
     status.className = 'ads-order-status is-dirty';
   };
@@ -103,7 +104,9 @@
   });
 
   saveButton.addEventListener('click', async () => {
-    if (!dirty) return;
+    if (!dirty || saving) return;
+    saving = true;
+    const submittedOrder = currentOrder();
     saveButton.disabled = true;
     status.textContent = 'Salvando nova ordem...';
     status.className = 'ads-order-status';
@@ -111,17 +114,24 @@
       const response = await fetch(saveUrl, {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-        body: JSON.stringify({order: currentOrder()}),
+        body: JSON.stringify({order: submittedOrder}),
       });
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.message || 'Não foi possível salvar.');
-      dirty = false;
-      status.textContent = data.message;
-      status.className = 'ads-order-status is-success';
+      if (JSON.stringify(currentOrder()) !== JSON.stringify(submittedOrder)) {
+        markDirty();
+      } else {
+        dirty = false;
+        status.textContent = data.message;
+        status.className = 'ads-order-status is-success';
+      }
     } catch (error) {
       saveButton.disabled = false;
       status.textContent = error.message || 'Erro ao salvar a ordem.';
       status.className = 'ads-order-status is-error';
+    } finally {
+      saving = false;
+      saveButton.disabled = !dirty;
     }
   });
 })();

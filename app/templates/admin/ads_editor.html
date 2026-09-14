@@ -1,8 +1,14 @@
 {% extends 'admin/layout.html' %}
 {% block admin_title %}Publicidade{% endblock %}
 {% block page_title %}Editor visual de publicidade{% endblock %}
-{% block page_subtitle %}Os três formatos comerciais agora têm posições fixas para manter a arte inteira, sem cortes nem deformação.{% endblock %}
+{% block page_subtitle %}Arraste os banners para escolher a ordem na coluna direita, mantendo a arte inteira e proporcional.{% endblock %}
 {% block admin_content %}
+{% macro order_actions(item) %}
+<div class="ads-order-actions">
+  <button type="button" data-move="up" aria-label="Mover {{ item.label }} para cima" title="Mover para cima"><i class="bi bi-arrow-up" aria-hidden="true"></i></button>
+  <button type="button" data-move="down" aria-label="Mover {{ item.label }} para baixo" title="Mover para baixo"><i class="bi bi-arrow-down" aria-hidden="true"></i></button>
+</div>
+{% endmacro %}
 <section class="panel-card ads-guide-card">
   <div class="ads-guide-grid">
     <div><span class="ads-guide-step">1</span><strong>460 × 320</strong><p>Coluna direita, com a mesma largura visual dos demais e altura proporcional.</p></div>
@@ -11,10 +17,10 @@
   </div>
 </section>
 
-<section class="ads-visual-layout">
+<section class="ads-visual-layout" data-ads-order-editor data-save-url="{{ url_for('admin.ads_order_post') }}">
   <div class="panel-card ads-visual-canvas">
     <div class="ads-visual-topline">
-      <div><h2>Mapa da home</h2><p>Prévia das novas posições. As imagens são exibidas sempre inteiras e proporcionais.</p></div>
+      <div><h2>Mapa da home</h2><p>Arraste os banners ou use as setas e salve a ordem. No admin, os desativados permanecem em sua posição; na home, os demais sobem automaticamente.</p></div>
       <a class="btn btn-outline-dark" href="{{ url_for('site.home') }}" target="_blank" rel="noopener">Ver site real</a>
     </div>
 
@@ -24,13 +30,6 @@
         <div class="ads-site-preview__header"><div class="ads-site-preview__search"></div><div class="ads-site-preview__logo">PARANÁ <b>ATUAL</b></div><div class="ads-site-preview__social">● ● ● ●</div></div>
         <div class="ads-site-preview__nav">INÍCIO &nbsp; BRASIL &nbsp; CIDADE &nbsp; ECONOMIA &nbsp; EDUCAÇÃO &nbsp; ESPORTE &nbsp; POLICIAL &nbsp; POLÍTICA</div>
       </div>
-
-      {% set ns = namespace(square=None, rectangle=None, portrait=None) %}
-      {% for item in slot_cards %}
-        {% if item.slot.key == 'sidebar_1' %}{% set ns.square = item %}{% endif %}
-        {% if item.slot.key == 'header_top' %}{% set ns.rectangle = item %}{% endif %}
-        {% if item.slot.key == 'sidebar_2' %}{% set ns.portrait = item %}{% endif %}
-      {% endfor %}
 
       <div class="ads-home-preview">
         <div class="ads-home-preview__content">
@@ -42,13 +41,17 @@
           <div class="ads-home-preview__cards">{% for i in range(3) %}<div><span></span><small><b>CIDADE</b>Matéria da categoria</small></div>{% endfor %}</div>
         </div>
 
-        <div class="ads-home-preview__sidebar">
-          {% for item in [ns.square, ns.rectangle, ns.portrait] if item %}
-          <div class="ads-preview-slot ads-preview-slot--{{ item.shape }}">
-            <span class="ads-preview-badge">{{ item.label }}</span>
-            <a class="ads-preview-edit" href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}">
-              <div class="ads-preview-art {% if item.cover_image %}has-image{% endif %}">{% if item.cover_image %}<img src="{{ item.cover_image }}" alt="{{ item.label }}">{% else %}<strong>{{ item.dimensions }}</strong><small>Clique para configurar</small>{% endif %}</div>
-              <div class="ads-preview-meta"><strong>{{ item.dimensions }}</strong><span>{{ item.banner_count }} banner(s)</span></div>
+        <div class="ads-home-preview__sidebar" data-ads-sortable="preview">
+          {% for item in slot_cards %}
+          <div class="ads-preview-slot ads-preview-slot--{{ item.shape }} ads-sortable-item" data-slot-key="{{ item.slot.key }}" draggable="true">
+            <div class="ads-sortable-toolbar">
+              <span class="ads-drag-handle" aria-hidden="true" title="Arraste para reordenar"><i class="bi bi-grip-vertical"></i></span>
+              <span class="ads-preview-badge">{{ item.label }}</span>
+              {{ order_actions(item) }}
+            </div>
+            <a class="ads-preview-edit" draggable="false" href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}">
+              <div class="ads-preview-art {% if item.cover_image %}has-image{% endif %}">{% if item.cover_image %}<img src="{{ item.cover_image }}" alt="{{ item.label }}" draggable="false">{% else %}<strong>{{ item.dimensions }}</strong><small>Clique para configurar</small>{% endif %}</div>
+              <div class="ads-preview-meta"><strong>{{ item.dimensions }}</strong><span>{{ item.banner_count }} banner(s) • {{ 'Ativo' if item.slot.is_active else 'Desativado' }}</span></div>
             </a>
           </div>
           {% endfor %}
@@ -58,15 +61,19 @@
   </div>
 
   <div class="panel-card ads-slot-list-card">
-    <div class="panel-head"><div><h2>Gerenciar os três formatos</h2><p>As posições agora são fixas; clique no formato para trocar imagens, links, rotação ou ativação.</p></div></div>
-    <div class="ads-slot-list">
+    <div class="panel-head"><div><h2>Gerenciar os três formatos</h2><p>Arraste ou use as setas para reordenar. Clique no formato para trocar imagens, links, rotação ou ativação.</p></div></div>
+    <div class="ads-slot-list" data-ads-sortable="list">
       {% for item in slot_cards %}
-      <div class="ads-slot-list-item">
-        <span class="admin-badge admin-badge--dark"><i class="bi bi-image"></i></span>
-        <a href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}"><div><strong>{{ item.label }}</strong><small>{{ item.hint }} • {{ item.dimensions }}</small></div></a>
-        <span>{{ item.banner_count }} banner(s)</span>
+      <div class="ads-slot-list-item ads-sortable-item" data-slot-key="{{ item.slot.key }}" draggable="true">
+        <span class="ads-drag-handle" aria-hidden="true" title="Arraste para reordenar"><i class="bi bi-grip-vertical"></i></span>
+        <a draggable="false" href="{{ url_for('admin.ads_manage', slot_id=item.slot.id) }}"><div><strong>{{ item.label }}</strong><small>{{ item.banner_count }} banner(s) • {{ 'Ativo' if item.slot.is_active else 'Desativado' }}</small></div></a>
+        {{ order_actions(item) }}
       </div>
       {% endfor %}
+    </div>
+    <div class="ads-order-footer">
+      <span class="ads-order-status" data-ads-order-status role="status" aria-live="polite">Ordem salva. Arraste para reorganizar.</span>
+      <button class="btn btn-dark" type="button" data-save-ads-order disabled>Salvar ordem</button>
     </div>
   </div>
 </section>

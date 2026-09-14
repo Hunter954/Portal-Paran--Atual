@@ -37,8 +37,8 @@
   </div>
 
   <aside class="pa-home-sidebar" aria-label="Publicidade">
-    {% for ad_item in ad_sidebar_items %}
-    <div class="{{ ad_item.wrapper_class }}" data-ad-slot="{{ ad_item.key }}">{% if ad_item.html %}{{ ad_item.html|safe }}{% endif %}</div>
+    {% for ad_item in ad_sidebar_items if ad_item.html|trim %}
+    <div class="{{ ad_item.wrapper_class }}" data-ad-slot="{{ ad_item.key }}">{{ ad_item.html|safe }}</div>
     {% endfor %}
   </aside>
 </section>
