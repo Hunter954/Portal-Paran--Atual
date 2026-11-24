@@ -45,3 +45,9 @@ Responda POSTAR na mensagem da pauta para receber a prévia. O worker lê a repo
 A migra??o cria radar_chat_sessions, radar_chat_cards, radar_chat_draft_replies e radar_draft_media. A configura??o do grupo e os alertas permanecem no gateway existente. A publica??o conserva as permiss?es definidas em RADAR_PUBLISHER_IDS e as verifica??es de duplicidade do Radar.
 
 Use RADAR FONTES para listar o cat?logo, RADAR FONTE ADICIONAR nome | URL | tipo para cadastrar e RADAR COLETAR ID para solicitar uma coleta. Para agendar, responda RADAR AGENDAR DD/MM/AAAA HH:MM na pr?via revisada, no hor?rio de Bras?lia. RADAR CANCELAR ID devolve uma pauta agendada ? revis?o.
+
+## Administração do portal no WhatsApp
+
+Use MENU, 2 e 1 para criar uma matéria normal. Envie primeiro o título e o texto na mesma mensagem, separados por uma linha em branco, ou em duas mensagens. A prévia aceita PUBLICAR, AGENDAR, edição por campo, BUSCAR FOTO e o envio de uma imagem como resposta. Categorias, usuários, publicidade, SEO, métricas e biblioteca ficam no menu principal.
+
+O Radar busca imagens pelo assunto depois de enviar uma nova prévia. Também é possível pedir BUSCAR FOTO com um assunto mais específico. Configure a variável `RADAR_GOOGLE_IMAGES_KEY` no worker para consultar o Google Imagens via SerpApi. Sem essa configuração, o worker consulta o Wikimedia Commons e preserva os créditos e a licença. Para anexar uma opção, responda USAR FOTO.

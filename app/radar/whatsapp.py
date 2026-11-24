@@ -121,7 +121,7 @@ def authorized_request():
 def receive():
     if not authorized_request():
         abort(401)
-    if request.content_length and request.content_length > 50000:
+    if request.content_length and request.content_length > 2_740_000:
         abort(413)
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
@@ -133,6 +133,12 @@ def receive():
         abort(400)
     group_id = data.get("group_id")
     quote_id = data.get("quote_id")
+    image = data.get("image")
+    if image is not None and (not isinstance(image, dict) or image.get("mime") not in {"image/jpeg", "image/png", "image/webp"}
+                              or not isinstance(image.get("data"), str) or len(image["data"]) > 2_666_668):
+        abort(400)
+    if image is None and request.content_length and request.content_length > 50000:
+        abort(413)
     if quote_id is not None and (not isinstance(quote_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{8,90}", quote_id)):
         abort(400)
     if group_id is not None:
@@ -149,6 +155,13 @@ def receive():
     if len(users) != 1:
         return jsonify(reply=None), 403
     user = users[0]
+    if data.get("image_offer") or image:
+        from .wa_console import accepts_image
+        allowed = accepts_image(user.id, group_id, quote_id)
+        if data.get("image_offer"):
+            return jsonify(need_image=allowed)
+        if not allowed:
+            return jsonify(reply=None)
     db.session.add(InboundMessage(event_key=event_id, user_id=user.id))
     try:
         db.session.flush()
@@ -157,7 +170,7 @@ def receive():
         return jsonify(reply=None)
     try:
         from .wa_console import group_menu
-        reply = group_menu(message, user.id, group_id, quote_id)
+        reply = group_menu(message, user.id, group_id, quote_id, image)
     except EditorialError as exc:
         reply = str(exc)
     db.session.commit()

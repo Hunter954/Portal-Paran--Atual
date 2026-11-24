@@ -23,7 +23,11 @@ test('passes selected group commands through the authenticated webhook and repli
     const data = JSON.parse(Buffer.concat(chunks));
     received.push({ auth: request.headers.authorization, ...data });
     response.writeHead(data.phone === '+' + administrator ? 200 : 403, { 'Content-Type': 'application/json' });
-    const result = data.text === 'RADAR LISTAR 1'
+    const result = data.image_offer
+      ? { need_image: data.quote_id === cardId && data.phone === '+' + administrator }
+      : data.image
+      ? { reply: 'Capa salva' }
+      : data.text === 'RADAR LISTAR 1'
       ? { reply: 'Pauta recente', messages: [{ id: cardId, text: 'Pauta #42' }] }
       : data.text === 'POSTAR'
       ? { messages: [{ text: 'Foto: Redação', cover: 'https://paranaatual.com.br' + photoPath }] }
@@ -110,5 +114,13 @@ test('passes selected group commands through the authenticated webhook and repli
   assert.deepEqual(covers.at(-1), Buffer.from([255, 216, 255]));
   await handleRadarMessage({ ...quote, key: { ...legacy, id: 'QUOTE_TEST_002' } }, 'PUBLICAR', reply);
   assert.equal(received.at(-1).text, 'PUBLICAR');
+  await handleRadarMessage({ key: { ...legacy, id: 'BODY_TEST_001' } }, 'Texto completo da matéria.', reply);
+  assert.equal(received.at(-1).text, 'Texto completo da matéria.');
+  const image = { key: { ...legacy, id: 'IMAGE_TEST_001' },
+    message: { imageMessage: { contextInfo: { stanzaId: cardId } } } };
+  await handleRadarMessage(image, '', reply, undefined, async () => ({ mime: 'image/jpeg', data: '/9j/' }));
+  assert.equal(received.at(-2).image_offer, true);
+  assert.deepEqual(received.at(-1).image, { mime: 'image/jpeg', data: '/9j/' });
+  assert.equal(replies.at(-1), 'Capa salva');
 });
 

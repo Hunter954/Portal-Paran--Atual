@@ -2,11 +2,12 @@ import click
 from sqlalchemy import inspect, text
 
 from ..models import db
-from .models import Alert, Article, Audit, ChatCard, ChatDraftReply, ChatSession, Draft, DraftMedia, GroupDelivery, InboundMessage, Job, Run, Source, Story, WhatsAppPreference
+from .models import (Alert, Article, Audit, ChatCard, ChatDraftReply, ChatSession, CoverSearch, Draft, DraftMedia, GroupDelivery,
+                     InboundMessage, Job, Run, SiteCard, SiteChat, Source, Story, WhatsAppPreference)
 
 
 TABLES = [model.__table__ for model in (Source, Run, Story, Article, Draft, Job, Audit, WhatsAppPreference, Alert, InboundMessage, GroupDelivery,
-                                             ChatSession, ChatCard, ChatDraftReply, DraftMedia)]
+                                             ChatSession, ChatCard, ChatDraftReply, DraftMedia, SiteChat, SiteCard, CoverSearch)]
 
 
 def upgrade():

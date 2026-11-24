@@ -219,6 +219,39 @@ class ChatDraftReply(db.Model):
     created = db.Column(db.DateTime, nullable=False, default=now)
 
 
+class SiteChat(db.Model):
+    __tablename__ = "radar_site_chat"
+
+    actor_id = db.Column(db.ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
+    scope = db.Column(db.String(40), primary_key=True)
+    step = db.Column(db.String(24), nullable=False)
+    data = db.Column(db.JSON, nullable=False, default=dict)
+    updated = db.Column(db.DateTime, nullable=False, default=now)
+
+
+class SiteCard(db.Model):
+    __tablename__ = "radar_site_cards"
+
+    message_id = db.Column(db.String(40), primary_key=True)
+    actor_id = db.Column(db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    scope = db.Column(db.String(40), nullable=False)
+    kind = db.Column(db.String(12), nullable=False)
+    data = db.Column(db.JSON, nullable=False)
+    created = db.Column(db.DateTime, nullable=False, default=now)
+
+
+class CoverSearch(db.Model):
+    __tablename__ = "radar_cover_searches"
+
+    id = db.Column(db.Integer, primary_key=True)
+    actor_id = db.Column(db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    scope = db.Column(db.String(40), nullable=False)
+    term = db.Column(db.String(220), nullable=False)
+    location = db.Column(db.String(100), nullable=False, default="")
+    target = db.Column(db.JSON, nullable=False)
+    created = db.Column(db.DateTime, nullable=False, default=now)
+    state = db.Column(db.String(12), nullable=False, index=True, default="pending")
+
 
 def audit(action, *, actor=None, story=None, source=None, details=None):
     db.session.add(Audit(action=action, actor_id=actor, story_id=story, source_id=source, details=details))

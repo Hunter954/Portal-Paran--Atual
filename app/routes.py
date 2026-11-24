@@ -393,7 +393,7 @@ def _hub_token_is_valid() -> bool:
 
 
 def _published_posts_query():
-    return Post.query.filter(Post.published_at.isnot(None))
+    return Post.query.filter(Post.published_at <= datetime.utcnow())
 
 def _track_view(post_id=None):
     try:

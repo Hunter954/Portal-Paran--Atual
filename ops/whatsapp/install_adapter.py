@@ -25,10 +25,28 @@ SWEEP_V4 = """        const radarMessage = { ...message, message: normalizeMessa
         const radarText = text || textFromMessage(radarMessage);
         const radarReply = (value, id) => socket.sendMessage(remoteJid, { text: value }, id ? { messageId: id } : undefined);
         if (await handleRadarMessage(radarMessage, radarText, radarReply, resolveRadarSender)) continue;"""
-CLIENT_SWEEP = SWEEP_V4.replace(
+SWEEP_V5 = SWEEP_V4.replace(
     "(value, id) => socket.sendMessage(remoteJid, { text: value },",
     "(value, id, cover) => socket.sendMessage(remoteJid, cover ? { image: cover, caption: value } : { text: value },",
 )
+CLIENT_SWEEP = SWEEP_V5.replace("radarReply, resolveRadarSender)", "radarReply, resolveRadarSender, readRadarImage)")
+READ_IMAGE = """async function readRadarImage(message) {
+  const image = message.message?.imageMessage;
+  const mime = image?.mimetype || '';
+  const limit = 2_000_000;
+  if (!/^image\\/(jpeg|png|webp)$/.test(mime) || Number(image.fileLength || 0) > limit) return null;
+  const stream = await downloadMediaMessage(message, 'stream', {}, { logger, reuploadRequest: sock.updateMediaMessage });
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of stream) {
+    size += chunk.length;
+    if (size > limit) return null;
+    chunks.push(chunk);
+  }
+  return size ? { mime, data: Buffer.concat(chunks, size).toString('base64') } : null;
+}
+
+"""
 RESOLVE_SENDER = """const resolveRegisteredRadarAliases = createPortalAliasResolver({
   loadAdminJids: getRadarAdminJids,
   lookup: jid => sock ? sock.onWhatsApp(jid.split('@')[0]) : [],
@@ -90,7 +108,7 @@ def main():
             client_text = replace_once(client_text, CLIENT_OLD_IMPORT, CLIENT_IMPORT)
         elif CLIENT_IMPORT not in client_text:
             client_text = CLIENT_IMPORT + "\n" + client_text
-        for legacy in (SWEEP_V4, SWEEP_V3, SWEEP_V2, SWEEP_V1):
+        for legacy in (SWEEP_V5, SWEEP_V4, SWEEP_V3, SWEEP_V2, SWEEP_V1):
             if legacy in client_text:
                 client_text = replace_once(client_text, legacy, CLIENT_SWEEP)
                 break
@@ -101,6 +119,8 @@ def main():
             client_text = ALIASES_IMPORT + "\n" + client_text
             client_text = replace_once(client_text, "  fetchLatestBaileysVersion,", "  fetchLatestBaileysVersion,\n  normalizeMessageContent,")
             client_text = replace_once(client_text, "export async function startWhatsApp()", RESOLVE_SENDER + "export async function startWhatsApp()")
+    if READ_IMAGE not in client_text:
+        client_text = replace_once(client_text, "export async function startWhatsApp()", READ_IMAGE + "export async function startWhatsApp()")
     if "export async function sendRadarGroup(" not in client_text:
         client_text = replace_once(client_text, "export async function sendLivoraPrivate",
                                    SEND_GROUP + "\nexport async function sendLivoraPrivate")

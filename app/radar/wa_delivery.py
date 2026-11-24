@@ -6,7 +6,7 @@ from secrets import token_hex
 from ..models import User, db
 from .editorial import EditorialError, latest_draft
 from .group_delivery import group_settings
-from .models import ChatDraftReply, Job, Story, now
+from .models import ChatDraftReply, CoverSearch, Job, Story, now
 from .wa_editorial import draft_cards
 from .whatsapp import enabled, gateway, phone_number
 
@@ -43,6 +43,12 @@ def send_pending_draft_reply():
     draft = latest_draft(story.id)
     if job.state == "done" and draft and story.state == "review":
         messages = draft_cards(story, draft, item.actor_id, item.scope)
+        target = {"story": story.id, "version": draft.version}
+        recent = CoverSearch.query.filter(CoverSearch.scope == item.scope,
+                                          CoverSearch.created >= now() - timedelta(hours=1))
+        if not any(search.target == target for search in recent):
+            db.session.add(CoverSearch(actor_id=item.actor_id, scope=item.scope, term=draft.title[:220],
+                                       location=story.location[:100], target=target))
     elif job.state == "error":
         from .wa_editorial import reply_card
         messages = [reply_card(story, f"Pauta *#{story.id}*\n{job.error or 'A geração falhou.'}\n"

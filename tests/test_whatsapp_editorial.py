@@ -55,7 +55,7 @@ def test_menu_accepts_quantity_replays_cards_and_resumes_requested_pages(portal,
     send, _ = provision(portal, monkeypatch)
     seed(13)
     assert send("7").json["reply"] is None
-    assert "Menu da redação" in send("menu").json["reply"]
+    assert "PARANÁ ATUAL | REDAÇÃO" in send("menu").json["reply"]
     assert "Quantas pautas" in send("9").json["reply"]
     first = send("12").json
     assert len(first["messages"]) == 10
@@ -172,4 +172,58 @@ def test_sources_and_scheduling_can_be_managed_in_chat(portal, monkeypatch):
     assert story.state == "scheduled" and Post.query.count() == 0
     assert "cancelado" in send(f"RADAR CANCELAR {story.id}").json["reply"]
     assert story.state == "review" and story.scheduled is None
+
+
+def test_standard_post_adds_photo_and_publishes_from_quoted_preview(portal, monkeypatch, tmp_path):
+    import base64
+
+    app, _ = portal
+    app.config["MEDIA_ROOT"] = str(tmp_path)
+    send, _ = provision(portal, monkeypatch)
+    assert "Matérias" in send("MENU").json["reply"]
+    assert "Nova matéria" in send("2").json["reply"]
+    assert "linha em branco" in send("1").json["reply"]
+    assert "texto completo" in send("Feira em Guarapuava").json["reply"]
+    post_card = send("A feira começou no domingo.\n\nA entrada foi gratuita.").json["messages"][-1]
+    assert "PUBLICAR" in post_card["text"]
+    assert send("", post_card["id"], image_offer=True).json["need_image"]
+    assert not send("", image_offer=True).json["need_image"]
+    image = {"mime": "image/jpeg", "data": base64.b64encode(b"\xff\xd8\xfflocal-cover").decode()}
+    updated = send("Crédito da redação", post_card["id"], image=image).json["messages"]
+    assert updated[0]["cover"].startswith("https://paranaatual.com.br/media/radar/")
+    assert "Crédito da redação" in updated[0]["text"]
+    assert "mudou" in send("PUBLICAR", post_card["id"]).json["reply"]
+    assert "publicada" in send("PUBLICAR", updated[-1]["id"]).json["reply"]
+    assert Post.query.one().published_at
+    assert Post.query.one().image_credit == "Crédito da redação"
+    assert app.test_client().get(Post.query.one().featured_image).status_code == 200
+
+
+def test_topic_image_search_stays_in_chat_and_updates_selected_post(portal, monkeypatch):
+    from app.radar.models import CoverSearch
+    from app.radar.wa_cover import run_cover_search
+
+    send, group = provision(portal, monkeypatch)
+    card = send("CMS NOVA Mostra em Curitiba | Haverá oficinas abertas.").json["messages"][-1]
+    assert "Buscando fotos" in send("BUSCAR FOTO Parque Barigui", card["id"]).json["reply"]
+    assert CoverSearch.query.one().term == "Parque Barigui"
+    photo = {"path": "/media/radar/photo.jpg", "credit": "Autora", "description": "Parque Barigui",
+             "url": "https://example.org/photo.jpg", "license": "CC BY 4.0"}
+    monkeypatch.setattr("app.radar.wa_cover.enabled", lambda: True)
+    monkeypatch.setattr("app.radar.wa_cover.group_settings", lambda: group)
+    monkeypatch.setattr("app.radar.wa_cover.search_images", lambda *_: (
+        "Wikimedia Commons", [(photo["url"], photo["credit"], photo["description"], photo["license"], "")]))
+    monkeypatch.setattr("app.radar.wa_cover.save_photo", lambda *_: photo)
+    delivered = []
+
+    def gateway_result(_method, _path, **params):
+        delivered.extend(params["json"]["messages"])
+        return {"accepted": True}
+
+    monkeypatch.setattr("app.radar.wa_cover.gateway", gateway_result)
+    run_cover_search()
+    assert "Wikimedia Commons" in delivered[0]["text"]
+    updated = send("USAR FOTO", delivered[0]["id"]).json["messages"]
+    assert updated[0]["cover"].endswith(photo["path"])
+    assert Post.query.one().featured_image == photo["path"]
 

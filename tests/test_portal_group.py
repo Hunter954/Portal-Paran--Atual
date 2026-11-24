@@ -50,7 +50,7 @@ def test_group_commands_require_selected_group_and_registered_admin(portal, monk
     assert client.post(target, json={**data, "group_id": "11111111@g.us"}, headers=headers).status_code == 403
     assert client.post(target, json={**data, "phone": "+5545990000022"}, headers=headers).status_code == 403
     response = client.post(target, json=data, headers=headers)
-    assert "Menu da redação" in response.json["reply"]
+    assert "PARANÁ ATUAL | REDAÇÃO" in response.json["reply"]
     assert client.post(target, json=data, headers=headers).json["reply"] is None
 
 

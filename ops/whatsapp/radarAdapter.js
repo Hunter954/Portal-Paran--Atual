@@ -152,7 +152,7 @@ async function boundedAliases(resolveAliases, candidates, groupId) {
   }
 }
 
-export async function handleRadarMessage(message, text, reply, resolveAliases) {
+export async function handleRadarMessage(message, text, reply, resolveAliases, readImage) {
   const url = process.env.RADAR_WHATSAPP_WEBHOOK;
   const token = process.env.RADAR_WHATSAPP_TOKEN;
   const messageKey = message?.key || {};
@@ -161,23 +161,23 @@ export async function handleRadarMessage(message, text, reply, resolveAliases) {
   const root = /^\s*\/?menu\s*$/i.test(text || '');
   const radar = /^\s*RADAR(?:\s|$)/i.test(text || '');
   const consoleCommand = /^\s*(?:CMS|SEO|PUBLICIDADE|USU[ÁA]RIOS|INSIGHTS)(?:\s|$)/i.test(text || '');
-  const directAction = /^\s*(?:POSTAR|PUBLICAR|CONFIRMAR|VER|FONTES|FOTO|GERAR|REFAZER|APROVAR|DESCARTAR|RESTAURAR|APURAR|APURADO|T[ÍI]TULO|TEXTO|RESUMO)(?:\s|$)/i.test(text || '');
-  const extra = /^\s*(?:[0-9]{1,4}|MAIS)\s*$/i.test(text || '');
-  const stanza = message?.message?.extendedTextMessage?.contextInfo?.stanzaId;
+  const directAction = /^\s*(?:POSTAR|PUBLICAR|CONFIRMAR|VER|FONTES|FOTO|CAPA|BUSCAR|USAR|AGENDAR|CATEGORIA|RETIRAR|GERAR|REFAZER|APROVAR|DESCARTAR|RESTAURAR|APURAR|APURADO|T[ÍI]TULO|TEXTO|RESUMO)(?:\s|$)/i.test(text || '');
+  const image = message?.message?.imageMessage;
+  const stanza = (message?.message?.extendedTextMessage?.contextInfo || image?.contextInfo)?.stanzaId;
   const quote = typeof stanza === 'string' && /^[A-Za-z0-9_-]{8,90}$/.test(stanza) ? stanza : undefined;
   if (group && !text && message?.messageStubType === 2 && groupStore?.handles(remote)) {
     console.info('Radar recebeu mensagem de grupo sem conteúdo descriptografado.');
   }
   if (!url || !token ||
-      (group ? !(root || radar || consoleCommand || directAction || extra) || !groupStore?.handles(remote)
-        : !(radar || consoleCommand || (directAction && quote)) || !/@(?:lid|s\.whatsapp\.net)$/.test(remote))) return false;
+      (group ? !(text || image) || !groupStore?.handles(remote)
+        : !(radar || consoleCommand || ((directAction || image) && quote)) || !/@(?:lid|s\.whatsapp\.net)$/.test(remote))) return false;
 
   if (messageKey.fromMe) {
     if (group && root) console.info('Radar menu recebido da conta vinculada.');
     return false;
   }
   const id = messageKey.id || '';
-  if (!/^[A-Za-z0-9_-]{8,90}$/.test(id) || text.length > 11500) {
+  if (!/^[A-Za-z0-9_-]{8,90}$/.test(id) || (text || '').length > 11500) {
     if (group && root) console.warn('Radar menu descartado por formato inválido.');
     return true;
   }
@@ -186,21 +186,31 @@ export async function handleRadarMessage(message, text, reply, resolveAliases) {
 
   let status;
   const tried = new Set();
+  function requestPortal(phone, payload) {
+    return fetch(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(5000),
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, id, text: text || '', ...(group ? { group_id: remote } : {}),
+        ...(quote ? { quote_id: quote } : {}), ...payload }),
+    });
+  }
+
   async function forward(jids) {
     for (const jid of jids) {
       if (!isPhoneJid(jid)) continue;
       const phone = '+' + jid.split(/[:@]/)[0];
       if (tried.has(phone) || tried.size >= 5) continue;
       tried.add(phone);
-      const response = await fetch(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(5000),
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, id, text, ...(group ? { group_id: remote } : {}),
-        ...(quote ? { quote_id: quote } : {}) }),
-      });
+      const response = await requestPortal(phone, image ? { image_offer: true } : {});
       status = response.status;
       if (status === 403) continue;
       if (!response.ok) return null;
-      return response.json();
+      const data = await response.json();
+      if (!image || !data.need_image) return data;
+      const bytes = await readImage?.(message).catch(() => null);
+      if (!bytes) return { reply: 'Envie uma foto JPG, PNG ou WebP de até 2 MB.' };
+      const uploaded = await requestPortal(phone, { image: bytes });
+      status = uploaded.status;
+      return uploaded.ok ? uploaded.json() : null;
     }
     return null;
   }

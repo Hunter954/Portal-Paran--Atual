@@ -95,30 +95,36 @@ def save_photo(fetcher, candidates):
             response = fetcher.image(public_url(url))
         except FetchError:
             continue
-        extension = image_extension(response.headers, response.body)
-        if response.status != 200 or not extension:
+        if response.status != 200:
             continue
-        filename = f"{sha256(response.body).hexdigest()}.{extension}"
-        directory = Path(current_app.config["MEDIA_ROOT"]) / "radar"
-        try:
-            directory.mkdir(parents=True, exist_ok=True)
-            dest = directory / filename
-            if not dest.exists():
-                with NamedTemporaryFile(dir=directory, delete=False) as temp:
-                    temp.write(response.body)
-                    temp_path = Path(temp.name)
-                try:
-                    temp_path.chmod(0o644)
-                    temp_path.replace(dest)
-                finally:
-                    temp_path.unlink(missing_ok=True)
-        except OSError:
-            return None
-        return {"path": f"{current_app.config['MEDIA_URL_PREFIX'].rstrip('/')}/radar/{filename}",
-                "credit": credit[:255], "description": description[:500], "url": response.url[:1000],
-                "license": licenses[0] if licenses else None}
+        photo = store_photo(response.body, response.headers, credit, description, response.url, licenses[0] if licenses else None)
+        if photo:
+            return photo
     return None
 
+
+def store_photo(body, headers, credit, description, url="", license_text=None, *, folder="radar"):
+    extension = image_extension(headers, body)
+    if not extension:
+        return None
+    filename = f"{sha256(body).hexdigest()}.{extension}"
+    directory = Path(current_app.config["MEDIA_ROOT"]) / folder
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        dest = directory / filename
+        if not dest.exists():
+            with NamedTemporaryFile(dir=directory, delete=False) as temp:
+                temp.write(body)
+                temp_path = Path(temp.name)
+            try:
+                temp_path.chmod(0o644)
+                temp_path.replace(dest)
+            finally:
+                temp_path.unlink(missing_ok=True)
+    except OSError:
+        return None
+    return {"path": f"{current_app.config['MEDIA_URL_PREFIX'].rstrip('/')}/{folder}/{filename}",
+            "credit": credit[:255], "description": description[:500], "url": url[:1000], "license": license_text}
 
 def report_sources(sources):
     fetcher = PublicFetcher()

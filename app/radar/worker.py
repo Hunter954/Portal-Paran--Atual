@@ -11,7 +11,8 @@ from .collector import next_run, run_collection, source_domain
 from .editorial import publish_due, run_job
 from .migration import radar_cli
 from . import seeds  # Registra o comando radar seed.
-from .models import Alert, ChatDraftReply, GroupDelivery, Job, Run, now
+from .models import Alert, ChatDraftReply, CoverSearch, GroupDelivery, Job, Run, now
+from .wa_cover import run_cover_search
 from .wa_delivery import send_pending_draft_reply
 from .group_delivery import send_pending_group
 from .whatsapp import send_pending_alert
@@ -44,6 +45,7 @@ def tick(domains):
         return
     publish_due()
     send_pending_alert()
+    run_cover_search()
     job = Job.query.filter_by(state="pending").order_by(Job.id).first()
     if job:
         run_job(job)
@@ -62,6 +64,7 @@ def tick(domains):
 
 def recover_interrupted():
     ChatDraftReply.query.filter_by(state="sending").update({"state": "failed"})
+    CoverSearch.query.filter_by(state="sending").update({"state": "failed"})
     GroupDelivery.query.filter_by(state="sending").update(
         {"state": "error", "message": "Entrega sem confirmação.", "finished": now()})
     Alert.query.filter_by(state="sending").update({"state": "error", "message": "Entrega sem confirmação.", "finished": now()})

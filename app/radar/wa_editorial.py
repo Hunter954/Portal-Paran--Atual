@@ -74,7 +74,7 @@ def draft_cards(story, draft, actor, group):
         full += "\nFoto de referência. Se tiver autorização de uso, responda *FOTO AUTORIZADA* seguida de quem autorizou."
     if draft.pending:
         full += "\n\nA conferir: " + " · ".join(draft.pending[:2])
-    confirmation = "Responda *PUBLICAR* ou *REFAZER* nesta mensagem."
+    confirmation = "Responda *PUBLICAR*, *REFAZER* ou *BUSCAR FOTO*. Você também pode enviar a foto nesta mensagem."
     if len(full) + len(confirmation) + 2 <= 3100:
         return [*images, reply_card(story, full + "\n\n" + confirmation, actor, group, draft)]
     chunks = []
@@ -198,6 +198,18 @@ def authorize_cover(story, card, raw, actor, group):
     audit("foto_autorizada", actor=actor, story=story.id, details=f"Versão {saved.version} · {reference}")
     return {"messages": draft_cards(story, saved, actor, group)}
 
+
+def save_cover_from_message(card, actor, group, text, image):
+    from .wa_cover import media_from_editor
+    require_draft = lock_story(card.story_id)
+    draft = latest_draft(card.story_id)
+    if not can_publish(actor) or not draft or draft.version != card.version or require_draft.state != "review":
+        raise EditorialError("Envie a foto na prévia atual da pauta.")
+    photo = media_from_editor(f"|{text}" if text else "", image)
+    saved = save_draft(require_draft, {"titulo": draft.title, "resumo": draft.excerpt, "corpo": draft.body}, actor, photo=photo)
+    audit("whatsapp_radar_foto_enviada", actor=actor, story=require_draft.id)
+    return {"messages": draft_cards(require_draft, saved, actor, group)}
+
 def radar_status():
     total = Story.query.filter(Story.state.in_(OPEN_STATES)).count()
     urgent = Story.query.filter(Story.state.in_(OPEN_STATES), Story.score >= 75).count()
@@ -244,7 +256,7 @@ def radar_command(text, actor, group, quote_id=None):
     if action in {"fonte", "coletar"} or (plain == "fontes" and not quote_id):
         from .wa_actions import source_command
         return source_command(raw, actor)
-    if action not in {"ver", "fontes", "foto", "titulo", "resumo", "texto", "postar", "publicar", "confirmar", "aprovar", "gerar", "refazer",
+    if action not in {"ver", "fontes", "foto", "buscar", "titulo", "resumo", "texto", "postar", "publicar", "confirmar", "aprovar", "gerar", "refazer",
                       "descartar", "restaurar", "apurar", "apurado", "agendar", "cancelar"}:
         return HELP
 
@@ -274,6 +286,14 @@ def radar_command(text, actor, group, quote_id=None):
         return edit_draft(story, card.version, action, value.strip(), actor, group)
     if action == "foto":
         return authorize_cover(story, card, raw, actor, group)
+    if action == "buscar" and len(words) > 1 and words[1] in {"foto", "capa"}:
+        current = latest_draft(story.id)
+        if not card or not current or card.version != current.version or story.state != "review":
+            raise EditorialError("Abra a prévia atual da pauta para buscar a capa.")
+        from .wa_cover import queue_search
+        parts = raw.split(maxsplit=2)
+        return queue_search(actor, group, {"story": story.id, "version": current.version}, current.title, story.location,
+                            parts[2] if len(parts) == 3 else "")
     if action == "apurado":
         latest = latest_draft(story.id)
         if not card or not latest or card.version != latest.version or story.state != "review":
