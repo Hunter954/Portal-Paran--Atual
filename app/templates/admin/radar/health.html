@@ -1,0 +1,24 @@
+{% extends "admin/radar/layout.html" %}
+{% block radar_content %}
+<header class="radar-heading"><h1>Saúde do sistema</h1></header>
+<div class="radar-panel">
+  <h2>Worker</h2>
+  <p>{{ 'Pausado' if paused else 'Ativo' if online else 'Sem atividade recente' }} · {{ pending_runs }} consulta(s) na fila · {{ pending_jobs }} geração(ões) na fila</p>
+  <p class="radar-meta">Último sinal {{ radar_datetime(heartbeat) or 'ainda não registrado' }}</p>
+  <form method="post" action="{{ url_for('radar.worker_action') }}">
+    <input type="hidden" name="csrf_token" value="{{ radar_csrf() }}">
+    <button class="btn btn-outline-dark" name="action" value="{{ 'resume' if paused else 'pause' }}">{{ 'Retomar worker' if paused else 'Pausar worker' }}</button>
+  </form>
+</div>
+<div class="radar-panel">
+  <h2>IA local</h2><p>{{ model if ai_configured else 'Ollama sem endereço configurado' }}</p>
+  {% for job in jobs %}
+  <p class="radar-meta mb-1"><a href="{{ url_for('radar.detail', story_id=job.story_id) }}">Pauta #{{ job.story_id }}</a> · {{ radar_datetime(job.created) }} · {{ {'pending': 'Na fila', 'running': 'Executando', 'done': 'Concluída', 'error': 'Falha'}.get(job.state) }}{% if job.error %} · {{ job.error }}{% endif %}</p>
+  {% endfor %}
+</div>
+<div class="radar-panel">
+  <h2>Últimas consultas</h2>
+  {% for run in runs %}<p class="radar-meta mb-1">{{ radar_datetime(run.started) }} · <a href="{{ url_for('radar.source_history', source_id=run.source_id) }}">Fonte #{{ run.source_id }}</a> · {{ run.message or 'Na fila ou em execução' }}</p>
+  {% else %}<p>Nenhuma consulta registrada.</p>{% endfor %}
+</div>
+{% endblock %}

@@ -14,6 +14,8 @@ from .routes import site_bp
 from .admin import admin_bp
 from .wp_client import WPClient
 from .sync import sync_categories, sync_posts
+from .radar.views import bp as radar_bp
+from .radar.whatsapp import bp as radar_gateway_bp
 
 login_manager = LoginManager()
 login_manager.login_view = "admin.login"
@@ -190,12 +192,15 @@ def create_app():
 
     app.register_blueprint(site_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(radar_bp)
+    app.register_blueprint(radar_gateway_bp)
 
     from datetime import datetime
     app.jinja_env.globals["now"] = datetime.now
 
     with app.app_context():
-        db.create_all()
+        db.metadata.create_all(db.engine, tables=[table for table in db.metadata.sorted_tables
+                                                   if not table.name.startswith("radar_")])
         _ensure_schema_updates()
         _ensure_defaults()
 

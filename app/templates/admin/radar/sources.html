@@ -1,0 +1,41 @@
+{% extends "admin/radar/layout.html" %}
+{% block radar_content %}
+<header class="radar-heading">
+  <div><h1>Fontes monitoradas</h1><p>Cadastre portais, feeds e sitemaps. O Radar verifica o vínculo de cada notícia com o Paraná.</p></div>
+  <a class="btn btn-dark" href="{{ url_for('radar.source_form') }}">Adicionar fonte</a>
+</header>
+{% if selected %}
+<div class="radar-panel" role="status">
+  <strong>Consulta #{{ selected.id }}</strong>
+  <p class="mb-0">{{ selected.message or ('Em execução.' if selected.state == 'running' else 'Aguardando o worker.') }}</p>
+  {% if selected.state in ['pending', 'running'] %}<a href="{{ url_for('radar.sources', run=selected.id) }}">Atualizar resultado</a>{% endif %}
+</div>
+{% endif %}
+{% for source in records %}
+{% set last = runs.get(source.id) %}
+<article class="radar-panel radar-source">
+  <div>
+    <div class="radar-meta">{{ kinds[source.kind] }}{% if source.region %} · {{ source.region }}{% endif %} · {{ 'Ativa' if source.active else 'Pausada' }}</div>
+    <h2>{{ source.name }}</h2>
+    <a class="radar-url" href="{{ source.url }}" target="_blank" rel="noopener noreferrer">{{ source.url }}</a>
+    <p class="radar-meta mt-2 mb-0">A cada {{ source.interval }} min · Prioridade {{ source.priority }} · Último sucesso {{ radar_datetime(source.last_success) or 'aguardando consulta' }}{% if source.failures %} · {{ source.failures }} falha(s){% endif %}</p>
+    {% if last %}<p class="radar-meta mb-0">{{ last.message or ('Coletando…' if last.state == 'running' else 'Consulta na fila.') }}</p>{% endif %}
+  </div>
+  <div class="radar-actions">
+    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('radar.source_form', source_id=source.id) }}">Editar</a>
+    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('radar.source_history', source_id=source.id) }}">Histórico</a>
+    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('radar.index', tab='all', source=source.id) }}">Buscar na fonte</a>
+    {% for action, label in [('test', 'Testar'), ('manual', 'Coletar agora'), ('toggle', 'Pausar' if source.active else 'Ativar')] %}
+    {% if source.active or action != 'manual' %}
+    <form method="post" action="{{ url_for('radar.source_action', source_id=source.id, action=action) }}">
+      <input type="hidden" name="csrf_token" value="{{ radar_csrf() }}">
+      <button class="btn btn-sm {{ 'btn-dark' if action == 'manual' else 'btn-outline-dark' }}">{{ label }}</button>
+    </form>
+    {% endif %}
+    {% endfor %}
+  </div>
+</article>
+{% else %}
+<div class="radar-panel radar-empty">Adicione a primeira fonte para começar o monitoramento.</div>
+{% endfor %}
+{% endblock %}

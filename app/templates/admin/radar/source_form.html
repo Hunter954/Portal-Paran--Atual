@@ -1,0 +1,34 @@
+{% extends "admin/radar/layout.html" %}
+{% block radar_content %}
+<header class="radar-heading"><h1>{{ 'Editar fonte' if source.id else 'Adicionar fonte' }}</h1><a href="{{ url_for('radar.sources') }}">Voltar às fontes</a></header>
+<form method="post" class="radar-panel radar-form">
+  <input type="hidden" name="csrf_token" value="{{ radar_csrf() }}">
+  <label>Nome<input class="form-control" name="name" required maxlength="160" value="{{ data.get('name', '') if data is not none else (source.name or '') }}"></label>
+  <label>URL pública<input class="form-control" name="url" type="url" required maxlength="1000" placeholder="https://site.com.br/feed/" value="{{ data.get('url', '') if data is not none else (source.url or '') }}"></label>
+  {% set chosen_kind = data.get('kind') if data is not none else source.kind %}
+  <label>Tipo
+    <select class="form-select" name="kind">
+      {% for kind, label in kinds.items() %}<option value="{{ kind }}" {{ 'selected' if chosen_kind == kind }}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <p class="radar-meta">Para cadastrar um site, informe uma página pública que lista as notícias ou anuncia um feed.</p>
+  <div class="radar-form-grid">
+    <label>Região da fonte<input class="form-control" name="region" maxlength="100" value="{{ data.get('region', '') if data is not none else (source.region or '') }}"></label>
+    <label>Categoria padrão<input class="form-control" name="category" maxlength="100" value="{{ data.get('category', '') if data is not none else (source.category or '') }}"></label>
+    <label>Intervalo em minutos<input class="form-control" name="interval" type="number" min="2" max="1440" required value="{{ data.get('interval') if data is not none else source.interval }}"></label>
+    <label>Prioridade da fonte<input class="form-control" name="priority" type="number" min="1" max="5" required value="{{ data.get('priority') if data is not none else source.priority }}"></label>
+  </div>
+  <label>Política de uso de conteúdo e imagens<textarea class="form-control" name="use_policy" rows="2" maxlength="300">{{ data.get('use_policy', '') if data is not none else (source.use_policy or '') }}</textarea></label>
+  <label class="radar-check"><input type="checkbox" name="active" value="1" {% if (data.get('active') == '1' if data is not none else source.active) %}checked{% endif %}> Ativar monitoramento</label>
+  <div class="radar-actions"><button class="btn btn-dark">Salvar fonte</button><a href="{{ url_for('radar.sources') }}">Cancelar</a></div>
+</form>
+{% if source.id %}
+<details class="radar-panel">
+  <summary>Remover fonte</summary>
+  <form method="post" class="mt-3" action="{{ url_for('radar.source_action', source_id=source.id, action='archive') }}">
+    <input type="hidden" name="csrf_token" value="{{ radar_csrf() }}">
+    <button class="btn btn-outline-danger">Remover do monitoramento</button>
+  </form>
+</details>
+{% endif %}
+{% endblock %}

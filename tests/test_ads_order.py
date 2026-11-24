@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 from app import create_app
 from app.config import Config
-from app.models import AdSlot, SiteSetting, db
+from app.models import AdSlot, SiteSetting, User, db
 
 
 class AdsOrderTest(unittest.TestCase):
@@ -24,9 +24,15 @@ class AdsOrderTest(unittest.TestCase):
         self.addCleanup(context.pop)
         self.addCleanup(db.session.remove)
         self.client = self.app.test_client()
-        with self.client.session_transaction() as session:
-            session['_user_id'] = '1'
-            session['_fresh'] = True
+        user = User(email='ads-qa@example.org', is_admin=True, is_active=True, whatsapp='+5545000000000')
+        user.set_password('ads-local-test')
+        db.session.add(user)
+        db.session.commit()
+        login = self.client.get('/admin/login')
+        token = BeautifulSoup(login.data, 'html.parser').find('input', {'name': 'csrf_token'})['value']
+        response = self.client.post('/admin/login', data={'email': user.email, 'password': 'ads-local-test',
+                                                         'csrf_token': token})
+        self.assertEqual(response.status_code, 302)
         self.keys = ['sidebar_1', 'header_top', 'sidebar_2']
         for key in self.keys:
             slot = AdSlot.query.filter_by(key=key).one()

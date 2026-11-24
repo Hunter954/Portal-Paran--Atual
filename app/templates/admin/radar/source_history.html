@@ -1,0 +1,14 @@
+{% extends "admin/radar/layout.html" %}
+{% block radar_content %}
+<header class="radar-heading"><div><h1>{{ source.name }}</h1><p>Histórico de consultas</p></div><a href="{{ url_for('radar.sources') }}">Voltar às fontes</a></header>
+<div class="radar-panel table-responsive">
+  <table class="table align-middle mb-0">
+    <thead><tr><th>Início</th><th>Consulta</th><th>Resultado</th><th>Duração</th></tr></thead>
+    <tbody>
+    {% for run in runs %}
+    <tr><td>{{ radar_datetime(run.started) }}</td><td>{{ {'auto': 'Automática', 'manual': 'Manual', 'test': 'Teste'}.get(run.kind) }}</td><td>{{ run.message or ('Em execução' if run.state == 'running' else 'Na fila') }}</td><td>{{ run.duration_ms ~ ' ms' if run.duration_ms is not none else '—' }}</td></tr>
+    {% else %}<tr><td colspan="4">Nenhuma consulta registrada.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

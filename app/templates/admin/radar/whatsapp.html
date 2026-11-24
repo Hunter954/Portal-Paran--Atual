@@ -1,0 +1,23 @@
+{% extends "admin/radar/layout.html" %}
+{% block radar_content %}
+<header class="radar-heading"><h1>WhatsApp Radar</h1></header>
+<div class="radar-panel">
+  <h2>Conexão</h2><p>{{ connection }}</p>
+  <p class="radar-meta">Os alertas são enviados em conversa privada ao número cadastrado no seu perfil.</p>
+  {% if number %}
+  <form method="post" class="radar-form">
+    <input type="hidden" name="csrf_token" value="{{ radar_csrf() }}">
+    <label class="radar-check"><input type="checkbox" name="enabled" value="1" {% if preference and preference.enabled %}checked{% endif %}> Quero receber alertas neste número (terminação {{ number[-4:] }})</label>
+    <label>Pontuação mínima<input type="number" min="75" max="100" name="minimum" class="form-control" required value="{{ preference.minimum if preference else 75 }}"></label>
+    <div><button class="btn btn-dark">Salvar preferências</button></div>
+  </form>
+  {% else %}<p>Cadastre seu WhatsApp na seção Usuários para habilitar alertas.</p>{% endif %}
+</div>
+<div class="radar-panel">
+  <h2>Alertas recentes</h2>
+  {% for alert in alerts %}
+    <p class="radar-meta"><a href="{{ url_for('radar.detail', story_id=alert.story_id) }}">Pauta #{{ alert.story_id }}</a> · {{ radar_datetime(alert.finished or alert.created) }} · {{ alert.message or 'Confirmação pendente' }}</p>
+  {% else %}<p>Nenhum alerta registrado.</p>{% endfor %}
+  {% if last_inbound %}<p class="radar-meta">Último comando em {{ radar_datetime(last_inbound.created) }}</p>{% endif %}
+</div>
+{% endblock %}

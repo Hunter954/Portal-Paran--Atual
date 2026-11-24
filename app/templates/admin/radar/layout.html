@@ -1,0 +1,15 @@
+{% extends "admin/layout.html" %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/radar.css') }}">{% endblock %}
+{% block admin_title %}Radar de Notícias{% endblock %}
+{% block page_title %}Radar de Notícias{% endblock %}
+{% block page_subtitle %}Central editorial do Paraná Atual{% endblock %}
+{% block admin_content %}
+<section class="radar">
+  <nav class="radar-nav" aria-label="Radar">
+    {% for key, label, endpoint in [('stories', 'Pautas', 'radar.index'), ('sources', 'Fontes e busca', 'radar.sources'), ('health', 'Saúde do sistema', 'radar.health'), ('whatsapp', 'WhatsApp', 'radar.whatsapp')] %}
+    <a href="{{ url_for(endpoint) }}" class="{{ 'active' if nav == key }}" {% if nav == key %}aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+  {% block radar_content %}{% endblock %}
+</section>
+{% endblock %}

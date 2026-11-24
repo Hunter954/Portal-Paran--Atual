@@ -1,0 +1,67 @@
+{% extends "admin/radar/layout.html" %}
+{% block radar_content %}
+<div class="radar-metrics">
+  {% for value, label in [(today, 'Notícias encontradas hoje'), (urgent, 'Pautas urgentes'), (pending, 'Aguardando revisão'), (failures, 'Fontes com falha')] %}
+  <div class="radar-metric"><strong>{{ value }}</strong><span>{{ label }}</span></div>
+  {% endfor %}
+</div>
+<form method="get" class="radar-panel radar-filter" action="{{ url_for('radar.index') }}">
+  <label class="radar-query">Buscar acontecimento
+    <input class="form-control" name="q" type="search" maxlength="160" value="{{ term }}" placeholder="Título, assunto ou palavra-chave">
+  </label>
+  <label>Município
+    <select class="form-select" name="city">
+      <option value="">Todos</option>
+      {% for name in cities %}<option value="{{ name }}" {{ 'selected' if city == name }}>{{ name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Região
+    <select class="form-select" name="region">
+      <option value="">Todas</option>
+      {% for name in regions %}<option value="{{ name }}" {{ 'selected' if region == name }}>{{ name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Categoria
+    <select class="form-select" name="category">
+      <option value="">Todas</option>
+      {% for name in categories %}<option value="{{ name }}" {{ 'selected' if category == name }}>{{ name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Fonte
+    <select class="form-select" name="source">
+      <option value="">Todas</option>
+      {% for source in sources %}<option value="{{ source.id }}" {{ 'selected' if source_id == source.id }}>{{ source.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <button class="btn btn-dark" name="tab" value="all">Buscar</button>
+</form>
+<nav class="radar-tabs" aria-label="Etapas editoriais">
+  {% for key, label in radar_tabs.items() %}
+  <a href="{{ url_for('radar.index', tab=key, q=term, city=city, region=region, category=category, source=source_id) }}" class="{{ 'active' if tab == key }}" {% if tab == key %}aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>
+{% for story in stories.items %}
+{% set original = story.articles[0] %}
+<article class="radar-panel radar-story">
+  <div class="radar-story-main">
+    <div class="radar-meta">{{ story.location }}{% if story.category %} · {{ story.category }}{% endif %} · {{ original.source.name }}</div>
+    <h2><a href="{{ url_for('radar.detail', story_id=story.id) }}">{{ story.title }}</a></h2>
+    <p>{{ original.summary }}</p>
+    <div class="radar-meta">Publicação {{ radar_datetime(original.published_at) or 'sem data confirmada' }} · {{ story.articles|length }} {{ 'fonte' if story.articles|length == 1 else 'fontes' }}</div>
+  </div>
+  <div class="radar-story-actions">
+    <span class="radar-score {{ 'urgent' if story.score >= 75 }}">{{ story.score }}/100 · {{ 'Crítica' if story.score >= 90 else 'Alta' if story.score >= 75 else 'Média' if story.score >= 45 else 'Baixa' }}</span>
+    <a class="btn btn-sm btn-dark" href="{{ url_for('radar.detail', story_id=story.id) }}">Abrir pauta</a>
+  </div>
+</article>
+{% else %}
+<div class="radar-panel radar-empty">Nenhuma pauta com os filtros selecionados. <a href="{{ url_for('radar.sources') }}">Consultar fontes</a></div>
+{% endfor %}
+{% if stories.pages > 1 %}
+<nav class="radar-actions" aria-label="Paginação">
+  {% if stories.has_prev %}<a class="btn btn-outline-dark" href="{{ url_for('radar.index', page=stories.prev_num, tab=tab, q=term, city=city, region=region, category=category, source=source_id) }}">Anterior</a>{% endif %}
+  <span>Página {{ stories.page }} de {{ stories.pages }}</span>
+  {% if stories.has_next %}<a class="btn btn-outline-dark" href="{{ url_for('radar.index', page=stories.next_num, tab=tab, q=term, city=city, region=region, category=category, source=source_id) }}">Próxima</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}
