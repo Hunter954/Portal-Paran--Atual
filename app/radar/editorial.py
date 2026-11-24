@@ -141,16 +141,20 @@ def generate(sources):
                 if result.get("done_reason") == "length":
                     raise EditorialError("A redação automática interrompeu o texto antes de terminar.") from exc
                 raise
-            if (not isinstance(short, dict) or not isinstance(short.get("s"), str)
+            if (not isinstance(short, dict) or not isinstance(short.get("t"), str) or not isinstance(short.get("s"), str)
                     or not isinstance(short.get("p"), list) or len(short["p"]) != 2):
                 raise ValueError
-            paragraphs = [complete_paragraph(p) for p in short["p"] if isinstance(p, str)]
-            if len(paragraphs) != 2 or any(len(p) < 42 for p in paragraphs):
+            paragraphs = [complete_paragraph(value) for value in short["p"] if isinstance(value, str)]
+            paragraphs = [text for text in paragraphs if len(text.split()) >= 5]
+            if sum(len(text.split()) for text in paragraphs) < 34:
                 raise EditorialError("A redação automática retornou um texto incompleto.")
+            title = short["t"].strip()
+            if len(title) >= SCHEMA["properties"]["t"]["maxLength"]:
+                title = reports[0]["titulo"]
             excerpt = short["s"].strip()
             if len(excerpt) == SCHEMA["properties"]["s"]["maxLength"] or excerpt.endswith((",", ":", "-", "–")):
                 excerpt = complete_paragraph(excerpt)
-            output = {"titulo": short["t"], "resumo": excerpt, "corpo": "\n\n".join(paragraphs),
+            output = {"titulo": title, "resumo": excerpt, "corpo": "\n\n".join(paragraphs),
                       "pendencias": [], "fatos": source_notes(reports)}
     except requests.Timeout as exc:
         raise EditorialError("A geração local excedeu o tempo limite.") from exc

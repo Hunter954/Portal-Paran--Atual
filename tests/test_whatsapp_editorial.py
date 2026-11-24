@@ -1,7 +1,9 @@
+import json
 from datetime import timedelta
+from unittest.mock import Mock
 
 from app.models import Post, User, db
-from app.radar.editorial import run_job
+from app.radar.editorial import generate, run_job
 from app.radar.models import Article, ChatCard, ChatDraftReply, CoverSearch, Draft, DraftMedia, Job, Source, Story, now
 from app.radar.wa_delivery import send_pending_draft_reply
 from test_radar import portal
@@ -9,6 +11,28 @@ from test_radar import portal
 
 GROUP = "12345678@g.us"
 PHONE = "+5545990000011"
+
+
+def test_model_draft_uses_source_heading_when_a_field_is_cut_off(monkeypatch):
+    monkeypatch.setenv("RADAR_OLLAMA_URL", "http://local.test")
+    data = {
+        "t": "Lauri Davies, empresário do transporte e pai de uma menina de oito anos, morreu em Marechal Rôn",
+        "s": "Mais informações sobre a batida serão divulgadas,",
+        "p": ["O motorista de uma van morreu em um acidente no oeste paranaense. As equipes de emergência foram "
+              "chamadas para atender a ocorrência e a polícia abriu uma apuração para determinar as circunstâncias da colisão.",
+              "A investigação continua."],
+    }
+    response = Mock(status_code=200)
+    response.json.return_value = {"message": {"content": json.dumps(data)}}
+    monkeypatch.setattr("app.radar.editorial.requests.Session.post", lambda *args, **kwargs: response)
+    source = {"id": 1, "titulo": "Batida no oeste do Paraná mata motorista de van",
+              "texto": ("Uma colisão com um caminhão matou um condutor no oeste do Paraná. "
+                        "O acidente mobilizou socorristas e policiais. A apuração busca identificar como o "
+                        "acidente aconteceu e as condições de circulação na rodovia.")}
+    result = generate([source])
+    assert result["titulo"] == source["titulo"]
+    assert not result["resumo"]
+    assert result["corpo"] == data["p"][0]
 
 
 def provision(portal, monkeypatch):
