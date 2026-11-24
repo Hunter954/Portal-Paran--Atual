@@ -8,7 +8,7 @@ O recorte geográfico é aplicado a cada item antes de ele entrar na fila. A se�
 
 - Utilize o mesmo PostgreSQL do CMS com `DATABASE_URL`. Faça backup e rode `flask --app app.radar.worker:create_worker_app radar migrate`. A migração só cria tabelas do Radar.
 - Rode `flask --app app.radar.worker:create_worker_app radar seed` para instalar os feeds iniciais. Execute `flask --app app.radar.worker:create_worker_app radar worker` em um único serviço com reinício controlado. PostgreSQL impede que dois workers ativos compartilhem a fila.
-- Para a IA, defina `RADAR_OLLAMA_URL` no portal e no worker, com acesso ao Ollama pela rede interna no worker. O padrão de `RADAR_OLLAMA_MODEL` é `qwen3:4b`. As gerações são sequenciais e exigem revisão editorial.
+- Para a IA, defina `RADAR_OLLAMA_URL` no portal e no worker, com acesso ao Ollama pela rede interna no worker. O padrão de `RADAR_OLLAMA_MODEL` é `qwen3.5:2b-q4_K_M`. As gerações são sequenciais e exigem revisão editorial.
 - A publicação no CMS exige revisão da versão atual, confirmação e `RADAR_ENABLE_PUBLISHING=1` na aplicação e no worker. Opcionalmente use `RADAR_PUBLISHER_IDS` para delimitar os IDs de administradores autorizados, separados por espaços. O padrão mantém a publicação desativada.
 - O adaptador de WhatsApp está em `ops/whatsapp` e utiliza o gateway Baileys existente. Aplique `python ops/whatsapp/install_adapter.py /copia/do/gateway` antes de construir sua imagem. Configure `RADAR_WHATSAPP_TOKEN` no portal, worker e gateway e `RADAR_WHATSAPP_URL` no portal e no worker. A configuração do gateway usa `RADAR_WHATSAPP_WEBHOOK` para o endpoint interno do portal `/internal/radar/whatsapp`. Os administradores habilitam alertas no próprio perfil do Radar. Para conhecer os comandos suportados envie `RADAR AJUDA` em conversa privada.
 
@@ -21,7 +21,7 @@ Encerre o worker, restaure a imagem anterior do portal e preserve o backup. Mant
 
 O portal e o gateway foram atualizados como serviços Docker Swarm do Dokploy. As imagens de referência para rollback são `parana-atual-radar-base:6ea2ed4` para o portal e `127.0.0.1:5000/paranapop-trivox-whatsapp:foztotal-prints-20261123` para o gateway. O backup PostgreSQL validado está no host em `/root/parana-atual-radar-20261124/before-radar.pg.dump`.
 
-O worker `radar-parana-worker` e o Ollama `radar-parana-ollama` têm reinício automático e limites de CPU e memória. O Ollama usa `qwen3:1.7b` nesta VPS após o teste do modelo de 4B ultrapassar o tempo limite. O serviço usa rede interna para inferência. O Dokploy está configurado para a branch `radar-parana-atual` no portal e para a imagem `127.0.0.1:5000/paranapop-trivox-whatsapp:parana-atual-radar-chat-20261124` no gateway, com as variáveis de integração registradas nos dois serviços.
+O worker `radar-parana-worker` e o Ollama `radar-parana-ollama` têm reinício automático e limites de CPU e memória. A geração tem tempo limite de 38 segundos no Ollama. O serviço usa rede interna para inferência. O Dokploy está configurado para a branch `radar-parana-atual` no portal e para a imagem `127.0.0.1:5000/paranapop-trivox-whatsapp:parana-atual-radar-chat-20261124` no gateway, com as variáveis de integração registradas nos dois serviços.
 
 Para retirar o Radar, pare `radar-parana-worker` e restaure as imagens anteriores dos serviços. Remova as configurações `RADAR_*` dos serviços ao restaurar o estado anterior. Use o backup apenas se houver necessidade de restaurar dados. O portal anterior funciona com as tabelas do Radar preservadas.
 
@@ -51,3 +51,5 @@ Use RADAR FONTES para listar o cat?logo, RADAR FONTE ADICIONAR nome | URL | tipo
 Use MENU, 2 e 1 para criar uma matéria normal. Envie primeiro o título e o texto na mesma mensagem, separados por uma linha em branco, ou em duas mensagens. A prévia aceita PUBLICAR, AGENDAR, edição por campo, BUSCAR FOTO e o envio de uma imagem como resposta. Categorias, usuários, publicidade, SEO, métricas e biblioteca ficam no menu principal.
 
 O Radar busca imagens pelo assunto depois de enviar uma nova prévia. Também é possível pedir BUSCAR FOTO com um assunto mais específico. Configure a variável `RADAR_GOOGLE_IMAGES_KEY` no worker para consultar o Google Imagens via SerpApi. Sem essa configuração, o worker consulta o Wikimedia Commons e preserva os créditos e a licença. Para anexar uma opção, responda USAR FOTO.
+
+O worker editorial prepara até quatro pautas recentes enquanto a fila está vazia e atende pedidos do WhatsApp primeiro. Texto e fotos seguem em filas independentes. Se a geração ficar incompleta, a conversa recebe as fontes e o comando TEXTO para concluir a prévia com revisão. A publicação continua vinculada à confirmação da versão.

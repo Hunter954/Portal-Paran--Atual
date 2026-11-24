@@ -11,7 +11,7 @@ from ..models import User, db
 from .editorial import EditorialError, latest_draft, lock_story, save_draft
 from .fetch import FetchError, PublicFetcher
 from .group_delivery import PUBLIC_URL, group_settings
-from .models import CoverSearch, audit, now
+from .models import CoverSearch, DraftMedia, Story, audit, now
 from .reporting import save_photo, store_photo
 from .wa_cms import card_message, get_post, plain, preview, preview_version, require_editor
 from .whatsapp import enabled, gateway, phone_number
@@ -52,6 +52,16 @@ def queue_search(actor, group, target, title, location="", query=""):
     db.session.add(CoverSearch(actor_id=actor, scope=group or "", term=term, location=location[:100], target=target))
     return f"🔎 Buscando fotos de *{term}*. As opções chegam aqui."
 
+
+def queue_draft_cover(story, draft, actor, group):
+    if not draft.body.strip() or db.session.get(DraftMedia, draft.id):
+        return
+    target = {"story": story.id, "version": draft.version}
+    recent = CoverSearch.query.filter(CoverSearch.scope == (group or ""),
+                                      CoverSearch.created >= now() - timedelta(hours=1))
+    if not any(search.target == target for search in recent):
+        db.session.add(CoverSearch(actor_id=actor, scope=group or "", term=draft.title[:220],
+                                   location=story.location[:100], target=target))
 
 def google_images(session, query):
     key = os.getenv("RADAR_GOOGLE_IMAGES_KEY")
@@ -162,6 +172,19 @@ def run_cover_search():
         messages.append(card_message("photo", {"photo": photo, "target": target}, text, actor, scope, PUBLIC_URL + photo["path"]))
         if len(messages) == 3:
             break
+    if not messages and "story" in target:
+        from .reporting import report_sources
+        story = db.session.get(Story, target["story"])
+        draft = latest_draft(story.id) if story else None
+        if draft and story.state == "review" and draft.version == target["version"] and story.articles:
+            article = story.articles[0]
+            _, photo = report_sources([{"url": article.url}])
+            if photo:
+                use = ("Responda *USAR FOTO*." if photo["license"]
+                       else "Com autorização, responda *USAR FOTO* seguida de quem autorizou.")
+                caption = f"🖼️ *Foto da reportagem original*\n{photo['credit']}\n{photo['description']}\n\n{use}"
+                messages.append(card_message("photo", {"photo": photo, "target": target},
+                                             caption, actor, scope, PUBLIC_URL + photo["path"]))
     if not messages:
         messages = [{"id": "3EB0" + token_hex(9).upper(),
                      "text": "Não encontrei uma foto para esse assunto. Tente *BUSCAR FOTO* com o nome do local ou envie sua foto na prévia."}]

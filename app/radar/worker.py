@@ -1,17 +1,19 @@
 import logging
+from datetime import timedelta
+from threading import Event, Thread
 from time import monotonic, sleep
 
 import click
-from flask import Flask
+from flask import Flask, current_app
 from sqlalchemy import text
 
 from ..config import Config
 from ..models import SiteSetting, db
 from .collector import next_run, run_collection, source_domain
-from .editorial import publish_due, run_job
+from .editorial import EditorialError, lock_story, publish_due, queue_draft, run_job
 from .migration import radar_cli
 from . import seeds  # Registra o comando radar seed.
-from .models import Alert, ChatDraftReply, CoverSearch, GroupDelivery, Job, Run, now
+from .models import Alert, ChatDraftReply, CoverSearch, GroupDelivery, Job, Run, Story, now
 from .wa_cover import run_cover_search
 from .wa_delivery import send_pending_draft_reply
 from .group_delivery import send_pending_group
@@ -40,16 +42,11 @@ def tick(domains):
     heartbeat()
     worker_paused = paused()
     send_pending_group(include_alerts=not worker_paused)
-    send_pending_draft_reply()
     if worker_paused:
         return
     publish_due()
     send_pending_alert()
     run_cover_search()
-    job = Job.query.filter_by(state="pending").order_by(Job.id).first()
-    if job:
-        run_job(job)
-        send_pending_draft_reply()
     run = next_run()
     if run:
         domain = source_domain(run)
@@ -62,15 +59,67 @@ def tick(domains):
     db.session.commit()
 
 
-def recover_interrupted():
-    ChatDraftReply.query.filter_by(state="sending").update({"state": "failed"})
+def recover_interrupted(*, editorial=True):
+    if editorial:
+        ChatDraftReply.query.filter_by(state="sending").update({"state": "failed"})
+        Job.query.filter_by(state="running").update({"state": "pending"})
     CoverSearch.query.filter_by(state="sending").update({"state": "failed"})
     GroupDelivery.query.filter_by(state="sending").update(
         {"state": "error", "message": "Entrega sem confirmação.", "finished": now()})
     Alert.query.filter_by(state="sending").update({"state": "error", "message": "Entrega sem confirmação.", "finished": now()})
     Run.query.filter_by(state="running").update({"state": "pending"})
-    Job.query.filter_by(state="running").update({"state": "pending"})
     db.session.commit()
+
+
+def prefetch_job():
+    latest = [story.id for story in Story.query.filter(
+        Story.state.in_(("new", "research", "production", "review")),
+        Story.created >= now() - timedelta(days=7), Story.articles.any(),
+    ).order_by(Story.id.desc()).limit(4)]
+    if not latest:
+        return None
+    candidate = Story.query.filter(Story.id.in_(latest), Story.state.in_(("new", "research")),
+                                   ~db.session.query(Job.id).filter(Job.story_id == Story.id).exists()
+                                   ).order_by(Story.id.desc()).first()
+    if candidate:
+        story = lock_story(candidate.id)
+        if story.state in {"new", "research"}:
+            try:
+                return queue_draft(story, None)
+            except EditorialError:
+                return None
+    return None
+
+
+def editorial_step(*, prefetch=True):
+    send_pending_draft_reply()
+    if paused():
+        return False
+    job = Job.query.filter_by(state="pending").order_by(Job.actor_id.is_(None), Job.id).first()
+    if job is None and prefetch:
+        job = prefetch_job()
+        if job:
+            db.session.flush()
+    if job is None:
+        return False
+    run_job(job)
+    send_pending_draft_reply()
+    return True
+
+
+def editorial_loop(app, stop):
+    while not stop.is_set():
+        with app.app_context():
+            try:
+                if editorial_step():
+                    continue
+            except Exception as exc:
+                db.session.rollback()
+                LOGGER.error("Falha no ciclo editorial do Radar (%s).", type(exc).__name__)
+                Job.query.filter_by(state="running").update({"state": "pending"})
+                ChatDraftReply.query.filter_by(state="sending").update({"state": "failed"})
+                db.session.commit()
+        stop.wait(0.8)
 
 
 @radar_cli.command("worker")
@@ -85,16 +134,22 @@ def worker(once):
             conn.commit()
         try:
             recover_interrupted()
+            stop = Event()
+            editor = Thread(target=editorial_loop, args=(current_app._get_current_object(), stop), daemon=True)
+            if not once:
+                editor.start()
             domains = {}
             while True:
                 try:
+                    if once:
+                        editorial_step(prefetch=False)
                     tick(domains)
                 except Exception as exc:
                     db.session.rollback()
                     LOGGER.error("Falha em ciclo do Radar (%s).", type(exc).__name__)
                     if once:
                         raise
-                    recover_interrupted()
+                    recover_interrupted(editorial=False)
                 finally:
                     db.session.remove()
                 if once:
@@ -103,6 +158,8 @@ def worker(once):
                     domains = {key: value for key, value in domains.items() if monotonic() - value < 60}
                 sleep(5)
         finally:
+            if "stop" in locals():
+                stop.set()
             if postgres:
                 conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": LOCK_ID})
 

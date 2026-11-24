@@ -126,7 +126,7 @@ def store_photo(body, headers, credit, description, url="", license_text=None, *
     return {"path": f"{current_app.config['MEDIA_URL_PREFIX'].rstrip('/')}/{folder}/{filename}",
             "credit": credit[:255], "description": description[:500], "url": url[:1000], "license": license_text}
 
-def report_sources(sources):
+def report_sources(sources, *, include_photo=True):
     fetcher = PublicFetcher()
     photo = None
     for index, source in enumerate(sources):
@@ -143,6 +143,6 @@ def report_sources(sources):
             source["texto"] = "\n".join(paragraphs)[:(3300 if index == 0 else 1500)]
             date = page.find("meta", attrs={"property": "article:published_time"})
             source["publicado"] = schema.get("datePublished") or (date.get("content") if date else None) or source.get("publicado")
-        if photo is None and index == 0:
+        if include_photo and index == 0:
             photo = save_photo(fetcher, photo_candidates(page, response.url, schema))
     return sources, photo

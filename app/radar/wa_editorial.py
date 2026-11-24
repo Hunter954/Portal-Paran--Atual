@@ -66,15 +66,24 @@ def draft_cards(story, draft, actor, group):
     images = [{"text": f"Foto: {photo.credit}" + (f"\n{photo.description}" if photo.description else ""),
                "cover": PUBLIC_URL + photo.path}] if photo else []
     source = story.articles[0]
-    full = (f"*Prévia · #{story.id}*\n\n*{draft.title}*\n"
-            f"{draft.excerpt}\n\n{draft.body}\n\nFonte: {source.url}")
-    if not photo:
-        full += "\nCapa: arte do Paraná Atual."
-    elif not photo.license:
+    if draft.body.strip():
+        full = (f"*Prévia · #{story.id}*\n\n*{draft.title}*\n"
+                f"{draft.excerpt}\n\n{draft.body}\n\nFonte: {source.url}")
+    else:
+        full = f"*Fontes da pauta #{story.id}*\n\n*{draft.title}*\nFonte: {source.url}"
+        first_fact = draft.facts[0].get("texto", "") if draft.facts else ""
+        words = first_fact.split()
+        if words:
+            snippet = " ".join(words[:24])
+            full += "\n\nTrecho da fonte\n" + snippet + ("…" if len(words) > 24 else "")
+    if draft.body.strip() and not photo:
+        full += "\nCapa: a busca de fotos pode chegar em seguida."
+    elif photo and not photo.license:
         full += "\nFoto de referência. Se tiver autorização de uso, responda *FOTO AUTORIZADA* seguida de quem autorizou."
     if draft.pending:
         full += "\n\nA conferir: " + " · ".join(draft.pending[:2])
-    confirmation = "Responda *PUBLICAR*, *REFAZER* ou *BUSCAR FOTO*. Você também pode enviar a foto nesta mensagem."
+    confirmation = ("Responda *PUBLICAR*, *REFAZER* ou *BUSCAR FOTO*. Você também pode enviar a foto nesta mensagem."
+                    if draft.body.strip() else "Responda *TEXTO* seguido da matéria para concluir a prévia.")
     if len(full) + len(confirmation) + 2 <= 3100:
         return [*images, reply_card(story, full + "\n\n" + confirmation, actor, group, draft)]
     chunks = []
@@ -134,19 +143,21 @@ def quoted_card(quote_id, actor, group):
 def legacy_draft(draft):
     origin = Draft.query.filter(Draft.story_id == draft.story_id, Draft.version <= draft.version,
                                 Draft.model.isnot(None)).order_by(Draft.version.desc()).first()
-    return bool(origin and not origin.model.endswith(":" + PROMPT_VERSION))
+    return bool(origin and not origin.model.endswith((":radar-pt-br-v3", ":" + PROMPT_VERSION)))
 
 
 def request_draft(story, actor, group, *, fresh=False):
     latest = latest_draft(story.id)
     if latest and story.state == "review" and not fresh and not legacy_draft(latest):
+        from .wa_cover import queue_draft_cover
+        queue_draft_cover(story, latest, actor, group)
         return {"messages": draft_cards(story, latest, actor, group)}
     job = queue_draft(story, actor)
     db.session.flush()
     previous = ChatDraftReply.query.filter_by(job_id=job.id, actor_id=actor, scope=group or "").first()
     if not previous:
         db.session.add(ChatDraftReply(job_id=job.id, actor_id=actor, scope=group or ""))
-    return f"Estou lendo a reportagem e buscando a foto da pauta *#{story.id}*. A prévia chega aqui em alguns minutos."
+    return f"Estou lendo a reportagem da pauta *#{story.id}*. Envio o texto primeiro e as fotos em seguida."
 
 
 def confirm_story(story, version, actor, group=None):

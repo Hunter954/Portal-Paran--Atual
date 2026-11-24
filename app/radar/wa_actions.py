@@ -72,6 +72,8 @@ def schedule_from_preview(story, card, raw, actor):
     from .wa_editorial import legacy_draft, request_draft
     if legacy_draft(draft):
         return request_draft(story, actor, card.scope, fresh=True)
+    if not draft.body.strip():
+        raise EditorialError("Envie o texto da matéria antes de agendar.")
     if not can_publish(actor):
         raise EditorialError("Este administrador não pode agendar publicações.")
     try:

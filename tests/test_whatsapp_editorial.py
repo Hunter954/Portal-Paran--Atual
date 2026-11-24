@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from app.models import Post, User, db
 from app.radar.editorial import run_job
-from app.radar.models import Article, ChatCard, ChatDraftReply, Job, Source, Story, now
+from app.radar.models import Article, ChatCard, ChatDraftReply, CoverSearch, Draft, DraftMedia, Job, Source, Story, now
 from app.radar.wa_delivery import send_pending_draft_reply
 from test_radar import portal
 
@@ -21,7 +21,7 @@ def provision(portal, monkeypatch):
     group = {"connected": True, "enabled": True, "available": True, "group_id": GROUP,
              "revision": "r1", "alerts": True, "minimum": 75}
     monkeypatch.setattr("app.radar.whatsapp.gateway", lambda *_a, **_k: group)
-    monkeypatch.setattr("app.radar.editorial.report_sources", lambda sources: (sources, None))
+    monkeypatch.setattr("app.radar.editorial.report_sources", lambda sources, **_options: (sources, None))
     client = app.test_client()
     headers = {"Authorization": "Bearer qa-token"}
     sent = 0
@@ -87,7 +87,6 @@ def test_quote_postar_prepares_draft_sends_it_and_publishes_only_current_review(
         "fatos": [{"fonte": article.id, "texto": "Aulas gratuitas"}], "pendencias": []})
     photo = {"path": "/media/radar/capa.jpg", "credit": "Fotógrafa", "description": "Feira no centro",
              "url": "https://fonte.example.org/capa.jpg"}
-    monkeypatch.setattr("app.radar.editorial.report_sources", lambda sources: (sources, photo))
     run_job(Job.query.one())
     monkeypatch.setattr("app.radar.wa_delivery.enabled", lambda: True)
     monkeypatch.setattr("app.radar.wa_delivery.group_settings", lambda: group)
@@ -96,6 +95,7 @@ def test_quote_postar_prepares_draft_sends_it_and_publishes_only_current_review(
     def deliver(method, path, **data):
         assert path == "/radar/group/reply"
         assert data["json"]["group_id"] == GROUP
+        assert CoverSearch.query.count() == 0
         deliveries.append(data["json"]["messages"])
         return {"accepted": True}
 
@@ -105,7 +105,10 @@ def test_quote_postar_prepares_draft_sends_it_and_publishes_only_current_review(
     assert len(deliveries) == 1 and request.state == "sent"
     draft = deliveries[0][-1]
     assert "PUBLICAR" in draft["text"] and "REFAZER" in draft["text"]
-    assert deliveries[0][0]["cover"] == "https://paranaatual.com.br/media/radar/capa.jpg"
+    assert not any(message.get("cover") for message in deliveries[0])
+    assert CoverSearch.query.one().target == {"story": Job.query.one().story_id, "version": 1}
+    db.session.add(DraftMedia(draft_id=Draft.query.one().id, **photo))
+    db.session.commit()
     assert ChatCard.query.filter_by(message_id=draft["id"]).one().version == 1
     updated = send("TÍTULO Oficina em Curitiba", draft["id"]).json["messages"][-1]
     assert ChatCard.query.filter_by(message_id=updated["id"]).one().version == 2
@@ -226,4 +229,51 @@ def test_topic_image_search_stays_in_chat_and_updates_selected_post(portal, monk
     updated = send("USAR FOTO", delivered[0]["id"]).json["messages"]
     assert updated[0]["cover"].endswith(photo["path"])
     assert Post.query.one().featured_image == photo["path"]
+
+
+def test_editorial_interruption_keeps_sources_available_and_blocks_empty_publication(portal, monkeypatch):
+    from app.radar.editorial import EditorialError, latest_draft
+
+    send, _ = provision(portal, monkeypatch)
+    seed(1)
+    story = Story.query.one()
+    assert "Envio o texto primeiro" in send(f"RADAR VER {story.id}").json["reply"]
+
+    def timeout(_sources):
+        raise EditorialError("O modelo local demorou mais que o limite.")
+
+    monkeypatch.setattr("app.radar.editorial.generate", timeout)
+    run_job(Job.query.one())
+    draft = latest_draft(story.id)
+    assert draft.body == "" and draft.facts
+    preview = send(f"RADAR VER {story.id}").json["messages"][-1]
+    assert "Fontes da pauta" in preview["text"] and "Responda *TEXTO*" in preview["text"]
+    assert "Envie o texto" in send("PUBLICAR", preview["id"]).json["reply"]
+    edited = send("TEXTO A programação tem aulas gratuitas em Curitiba.", preview["id"]).json["messages"][-1]
+    assert "publicada" in send("PUBLICAR", edited["id"]).json["reply"]
+
+
+def test_prefetch_uses_the_idle_writer_then_prioritizes_a_chat_request(portal, monkeypatch):
+    from app.radar.editorial import queue_draft
+    from app.radar.worker import editorial_step
+
+    _, actor = portal
+    monkeypatch.setenv("RADAR_OLLAMA_URL", "http://local.test")
+    seed(2)
+    recent, earlier = Story.query.order_by(Story.id.desc()).all()
+    queue_draft(recent, None)
+    queue_draft(earlier, actor)
+    db.session.commit()
+    order = []
+
+    def take_job(job):
+        order.append(job.story_id)
+        job.state = "done"
+        db.session.commit()
+
+    monkeypatch.setattr("app.radar.worker.run_job", take_job)
+    monkeypatch.setattr("app.radar.worker.send_pending_draft_reply", lambda: None)
+    assert editorial_step()
+    assert editorial_step()
+    assert order == [earlier.id, recent.id]
 
