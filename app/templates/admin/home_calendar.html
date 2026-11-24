@@ -1,0 +1,16 @@
+{% extends 'admin/layout.html' %}
+{% block admin_title %}Calendário da home{% endblock %}
+{% block page_title %}Calendário da home{% endblock %}
+{% block page_subtitle %}Selecione a edição que aparece na página inicial{% endblock %}
+{% block admin_content %}
+<section class="panel-card">
+  <div class="panel-head"><div><h2>Data das matérias na home</h2><p>Ative o calendário e escolha uma data com matérias publicadas. Para voltar à edição mais recente, desative o calendário.</p></div></div>
+  <form method="post" class="vstack gap-3">
+    <input type="hidden" name="csrf_token" value="{{ portal_csrf() }}">
+    <label class="form-check"><input class="form-check-input" type="checkbox" name="enabled" value="1" {{ 'checked' if day }}> Ativar edição por data</label>
+    <label>Data da edição<input class="form-control mt-1" type="date" name="day" value="{{ day or today }}" max="{{ today }}"></label>
+    <div><button class="btn btn-dark">Salvar edição</button></div>
+  </form>
+</section>
+{% endblock %}
+

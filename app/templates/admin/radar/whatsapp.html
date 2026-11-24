@@ -1,8 +1,50 @@
 {% extends "admin/radar/layout.html" %}
 {% block radar_content %}
 <header class="radar-heading"><h1>WhatsApp Radar</h1></header>
+<p class="radar-meta mb-0">Conexão: {{ connection }}</p>
 <div class="radar-panel">
-  <h2>Conexão</h2><p>{{ connection }}</p>
+  <div class="radar-heading">
+    <div><h2>Grupo do Paraná Atual</h2>
+      <p>Escolha o grupo da redação e ative os envios desejados.</p>
+    </div>
+    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('radar.whatsapp') }}">Atualizar grupos</a>
+  </div>
+  {% if group_error %}<p class="alert alert-warning mb-2">{{ group_error }}</p>{% endif %}
+  {% if group %}
+  <form method="post" action="{{ url_for('radar.whatsapp_group_save') }}" class="radar-form">
+    <input type="hidden" name="csrf_token" value="{{ radar_csrf() }}">
+    <input type="hidden" name="revision" value="{{ group.revision }}">
+    <label>Grupo da redação
+      <select class="form-select" name="group_id" aria-describedby="whatsapp-group-help">
+        <option value="">Escolher grupo</option>
+        {% if group.group_id and group.group_id not in group_options|map(attribute='id')|list %}
+        <option value="{{ group.group_id }}" selected>{{ group.group_name or 'Grupo salvo' }}</option>
+        {% endif %}
+        {% for item in group_options %}
+        <option value="{{ item.id }}" {% if item.id == group.group_id %}selected{% endif %} {% if not item.available and item.id != group.group_id %}disabled{% endif %}>{{ item.name }}{% if item.participants_count %} · {{ item.participants_count }} participantes{% endif %}{% if not item.available %} · Em uso por outro portal{% endif %}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <p class="radar-meta mb-0" id="whatsapp-group-help">Grupos disponíveis na sessão conectada. Os envios começam com itens novos após a ativação.</p>
+    <label class="radar-check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if group.enabled }}> Ativar bot e comandos no grupo</label>
+    <label class="radar-check"><input type="checkbox" name="news" value="1" {{ 'checked' if group.news }}> Enviar novas matérias publicadas</label>
+    <label class="radar-check"><input type="checkbox" name="alerts" value="1" {{ 'checked' if group.alerts }}> Enviar alertas de pautas do Radar</label>
+    <label>Pontuação mínima do alerta<input class="form-control" type="number" min="75" max="100" name="minimum" value="{{ group.minimum }}" required></label>
+    <div><button type="submit" class="btn btn-dark">Salvar grupo e automações</button></div>
+  </form>
+  {% endif %}
+</div>
+{% if group and group.group_id %}
+<div class="radar-panel">
+  <h2>Envios ao grupo</h2>
+  {% for delivery in group_deliveries %}
+  <p class="radar-meta mb-1">{{ 'Matéria' if delivery.kind == 'article' else 'Pauta do Radar' }} #{{ delivery.subject_id }} ·
+    {{ radar_datetime(delivery.finished or delivery.created) }} · {{ delivery.message or 'Aguardando confirmação' }}</p>
+  {% else %}<p class="mb-0">Nenhum envio registrado para este grupo.</p>{% endfor %}
+</div>
+{% endif %}
+<div class="radar-panel">
+  <h2>Alertas no privado</h2>
   <p class="radar-meta">Os alertas são enviados em conversa privada ao número cadastrado no seu perfil.</p>
   {% if number %}
   <form method="post" class="radar-form">

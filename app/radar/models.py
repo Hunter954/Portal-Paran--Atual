@@ -148,6 +148,20 @@ class Alert(db.Model):
     finished = db.Column(db.DateTime)
 
 
+
+class GroupDelivery(db.Model):
+    __tablename__ = "radar_group_deliveries"
+    __table_args__ = (db.UniqueConstraint("group_id", "kind", "subject_id"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.String(40), nullable=False, index=True)
+    kind = db.Column(db.String(10), nullable=False)
+    subject_id = db.Column(db.Integer, nullable=False)
+    state = db.Column(db.String(12), nullable=False)
+    message = db.Column(db.String(160))
+    created = db.Column(db.DateTime, nullable=False, default=now)
+    finished = db.Column(db.DateTime)
+
 class InboundMessage(db.Model):
     __tablename__ = "radar_whatsapp_events"
 

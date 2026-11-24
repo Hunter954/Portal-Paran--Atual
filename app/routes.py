@@ -559,6 +559,13 @@ def hub_posts_delete_api():
 def home():
     _track_view(None)
 
+    from .portal_tools import day_bounds, home_date
+    edition = home_date()
+    scope = _published_posts_query()
+    if edition:
+        first, last = day_bounds(edition)
+        scope = scope.filter(Post.published_at >= first, Post.published_at < last)
+
     def _post_identity(item):
         # Evita repetir a mesma matéria na home mesmo quando a importação criou
         # registros diferentes com o mesmo título.
@@ -580,7 +587,7 @@ def home():
                 break
         return result
 
-    latest_candidates = (_published_posts_query()
+    latest_candidates = (scope
                          .order_by(desc(Post.published_at), desc(Post.id))
                          .limit(60).all())
     latest = _unique_posts(latest_candidates, limit=24)
@@ -592,7 +599,7 @@ def home():
         cat = Category.query.filter_by(slug=slug).first()
         if not cat:
             return None, []
-        q = (_published_posts_query().join(Post.categories)
+        q = (scope.join(Post.categories)
              .filter(Category.id == cat.id))
         if exclude_ids:
             q = q.filter(~Post.id.in_(list(exclude_ids)))
@@ -639,7 +646,7 @@ def home():
     ))
 
     for category_item in ordered_categories:
-        candidates = (_published_posts_query().join(Post.categories)
+        candidates = (scope.join(Post.categories)
                       .filter(Category.id == category_item.id)
                       .order_by(desc(Post.published_at), desc(Post.id))
                       .limit(100).all())
@@ -675,7 +682,7 @@ def home():
     popular_map = {pid: c for pid, c in popular_ids if pid}
     popular_posts = []
     if popular_map:
-        posts = _published_posts_query().filter(Post.id.in_(list(popular_map.keys()))).all()
+        posts = scope.filter(Post.id.in_(list(popular_map.keys()))).all()
         posts_by_id = {p.id: p for p in posts}
         popular_posts = [posts_by_id[pid] for pid, _ in popular_ids if pid in posts_by_id]
 

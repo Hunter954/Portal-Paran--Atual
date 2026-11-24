@@ -8,7 +8,7 @@ import requests
 from flask import Blueprint, abort, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
-from ..models import User, db
+from ..models import Post, User, db
 from .editorial import EditorialError, lock_story, queue_draft
 from .geography import normalize
 from .models import Alert, InboundMessage, Story, WhatsAppPreference, audit, now
@@ -38,6 +38,12 @@ def gateway(method, path, **kwargs):
                                        headers={"Authorization": "Bearer " + os.environ["RADAR_WHATSAPP_TOKEN"]},
                                        timeout=(3, 7), allow_redirects=False, **kwargs)
             if response.status_code != 200:
+                if response.status_code in {400, 409}:
+                    message = response.json().get("message")
+                    if isinstance(message, str):
+                        error = EditorialError(message[:160])
+                        error.status_code = response.status_code
+                        raise error
                 raise EditorialError(f"Gateway retornou HTTP {response.status_code}.")
             return response.json()
     except (requests.RequestException, ValueError) as exc:
@@ -102,8 +108,10 @@ def send_pending_alert():
         return
 
 
+GROUP_ID = re.compile(r"\d{5,30}@g\.us")
+
 COMMANDS = ("RADAR URGENTES · RADAR PENDENTES · RADAR STATUS · RADAR FONTES ID · "
-            "RADAR RESUMO ID · RADAR APROVAR ID · RADAR GERAR ID · RADAR DESCARTAR ID")
+            "RADAR RESUMO ID · RADAR APROVAR ID · RADAR GERAR ID · RADAR DESCARTAR ID · RADAR POSTAR ID")
 
 
 @bp.post("")
@@ -122,14 +130,26 @@ def receive():
             or not isinstance(event_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{8,90}", event_id)
             or not isinstance(message, str) or len(message) > 160):
         abort(400)
-    authorized = db.session.query(WhatsAppPreference, User).join(
-        User, User.id == WhatsAppPreference.user_id
-    ).filter(User.is_admin.is_(True), User.is_active.is_(True),
-        WhatsAppPreference.phone == phone, WhatsAppPreference.enabled.is_(True)
-    ).first()
-    if not authorized or phone_number(authorized[1].whatsapp) != phone:
+    group_id = data.get("group_id")
+    if group_id is not None:
+        if not isinstance(group_id, str) or not GROUP_ID.fullmatch(group_id):
+            abort(400)
+        try:
+            config = gateway("GET", "/radar/group/settings")
+        except EditorialError:
+            return jsonify(reply=None), 503
+        if not config.get("enabled") or not config.get("available") or config.get("group_id") != group_id:
+            return jsonify(reply=None), 403
+        users = [user for user in User.query.filter_by(is_admin=True, is_active=True)
+                 .filter(User.whatsapp.isnot(None)) if phone_number(user.whatsapp) == phone]
+    else:
+        user = db.session.query(User).join(WhatsAppPreference, User.id == WhatsAppPreference.user_id).filter(
+            User.is_admin.is_(True), User.is_active.is_(True), WhatsAppPreference.phone == phone,
+            WhatsAppPreference.enabled.is_(True)).first()
+        users = [user] if user and phone_number(user.whatsapp) == phone else []
+    if len(users) != 1:
         return jsonify(reply=None), 403
-    user = authorized[1]
+    user = users[0]
     db.session.add(InboundMessage(event_key=event_id, user_id=user.id))
     try:
         db.session.flush()
@@ -137,11 +157,44 @@ def receive():
         db.session.rollback()
         return jsonify(reply=None)
     try:
-        reply = command(normalize(message), user.id)
+        text = normalize(message).strip()
+        reply = group_menu(text, user.id) if group_id is not None else command(text, user.id)
     except EditorialError as exc:
         reply = str(exc)
     db.session.commit()
     return jsonify(reply=reply)
+
+
+GROUP_MENU = (
+    "*Paraná Atual · Menu da redação*\n\n"
+    "1 — Pautas do Radar\n2 — Alertas urgentes\n3 — Últimas matérias\n"
+    "4 — Painel e serviços\n5 — Comandos do Radar\n\n"
+    "Digite uma opção ou RADAR AJUDA."
+)
+
+
+def group_menu(text, actor):
+    if text in {"menu", "/menu"}:
+        return GROUP_MENU
+    if text == "1":
+        return command("radar pendentes", actor)
+    if text == "2":
+        return command("radar urgentes", actor)
+    if text == "3":
+        from .group_delivery import post_url
+
+        posts = Post.query.filter(Post.published_at <= now()).order_by(Post.published_at.desc()).limit(5)
+        return "\n\n".join(f"{post.title}\n{post_url(post)}" for post in posts) or "Nenhuma matéria publicada."
+    if text == "4":
+        return ("Painel: https://paranaatual.com.br/admin/\n"
+                "Matérias: https://paranaatual.com.br/admin/posts\n"
+                "Radar: https://paranaatual.com.br/admin/radar/\n"
+                "Publicidade: https://paranaatual.com.br/admin/ads\n"
+                "Print automático: https://paranaatual.com.br/admin/prints\n"
+                "Para solicitar relatórios de prints, envie RELATÓRIO no privado do bot.")
+    if text == "5":
+        return COMMANDS
+    return command(text, actor)
 
 
 def command(text, actor):

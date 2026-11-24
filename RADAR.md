@@ -25,3 +25,12 @@ O worker `radar-parana-worker` e o Ollama `radar-parana-ollama` têm reinício a
 
 Para retirar o Radar, pare `radar-parana-worker` e restaure as imagens anteriores dos serviços. Remova as configurações `RADAR_*` dos serviços ao restaurar o estado anterior. Use o backup apenas se houver necessidade de restaurar dados. O portal anterior funciona com as tabelas do Radar preservadas.
 
+
+## WhatsApp em grupo e ferramentas do portal
+
+Abra **WhatsApp** no menu principal do administrativo, escolha o grupo da redação e ative o bot. **Enviar novas matérias publicadas** compartilha artigos do CMS e do Radar. **Enviar alertas de pautas do Radar** aplica a pontuação escolhida a pautas novas do Paraná. As duas opções são independentes. A seleção persiste no volume de autenticação já usado pelo gateway. Grupos configurados para outros portais aparecem bloqueados.
+
+No grupo selecionado, um administrador ativo com WhatsApp cadastrado pode usar `menu` e os comandos `RADAR`. O navegador também oferece **Estúdio de mídia** para artes e vídeos, **Calendário da home** para escolher uma edição e **Print automático** para consultar os comprovantes já registrados e baixar um Word.
+
+A captura usa `PARANAATUAL_AD_REPORTS_URL` e `PARANAATUAL_AD_REPORTS_TOKEN`. Execute a migração do Radar antes de ligar o worker atualizado. A nova tabela `radar_group_deliveries` registra partilhas de matérias e alertas, com controle de duplicatas. Envios começam a partir da ativação do grupo ou da automação. A revisão e a confirmação da versão são obrigatórias para publicar uma pauta do Radar pelo painel.
+

@@ -17,8 +17,9 @@ from .editorial import (EditorialError, can_publish, latest_draft, lock_story,
                         model_name, publish, queue_draft, save_draft, verify_approval)
 from .feeds import SOURCE_KINDS
 from .fetch import public_url
-from .models import Alert, Article, Audit, Draft, InboundMessage, Job, Run, Source, Story, WhatsAppPreference, audit, now
-from .whatsapp import phone_number, status as whatsapp_status
+from .models import Alert, Article, Audit, Draft, GroupDelivery, InboundMessage, Job, Run, Source, Story, WhatsAppPreference, audit, now
+from .group_delivery import group_settings
+from .whatsapp import GROUP_ID, gateway, phone_number, status as whatsapp_status
 
 
 bp = Blueprint("radar", __name__, url_prefix="/admin/radar")
@@ -327,6 +328,30 @@ def worker_action():
 
 
 
+@bp.post("/whatsapp/grupo")
+def whatsapp_group_save():
+    group_id = request.form.get("group_id", "")
+    minimum = request.form.get("minimum", type=int)
+    bot = request.form.get("enabled") == "1"
+    if (group_id and not GROUP_ID.fullmatch(group_id)) or (bot and not group_id) or not minimum or not 75 <= minimum <= 100:
+        flash("Confira o grupo e a pontuação mínima.", "warning")
+        return redirect(url_for("radar.whatsapp"))
+    try:
+        gateway("POST", "/radar/group/settings", json={
+            "group_id": group_id, "enabled": bot, "minimum": minimum,
+            "news": request.form.get("news") == "1", "alerts": request.form.get("alerts") == "1",
+            "revision": request.form.get("revision", ""),
+        })
+    except EditorialError as exc:
+        flash(str(exc), "danger")
+    else:
+        audit("whatsapp_grupo_atualizado", actor=current_user.id,
+              details="Bot ativado" if bot else "Bot pausado")
+        db.session.commit()
+        flash("Grupo salvo. Digite menu no grupo para abrir os atalhos." if bot else "Configuração salva.", "success")
+    return redirect(url_for("radar.whatsapp"))
+
+
 @bp.route("/whatsapp", methods=["GET", "POST"])
 def whatsapp():
     preference = db.session.get(WhatsAppPreference, current_user.id)
@@ -351,7 +376,19 @@ def whatsapp():
                 db.session.rollback()
                 flash("Este número já está associado a outro administrador do Radar.", "warning")
         return redirect(url_for("radar.whatsapp"))
-    return screen("whatsapp", nav="whatsapp", preference=preference, number=phone,
+    group = None
+    group_options, group_deliveries, group_error = [], [], ""
+    try:
+        group = group_settings()
+        if group.get("connected"):
+            group_options = gateway("GET", "/radar/group/list").get("groups", [])
+        if group.get("group_id"):
+            group_deliveries = GroupDelivery.query.filter_by(group_id=group["group_id"]).order_by(
+                GroupDelivery.id.desc()).limit(20).all()
+    except EditorialError as exc:
+        group_error = str(exc)
+    return screen("whatsapp", nav="whatsapp", preference=preference, number=phone, group=group,
+                  group_options=group_options, group_error=group_error, group_deliveries=group_deliveries,
                   connection=whatsapp_status(), alerts=Alert.query.filter_by(user_id=current_user.id)
                   .order_by(Alert.id.desc()).limit(20),
                   last_inbound=InboundMessage.query.filter_by(user_id=current_user.id)

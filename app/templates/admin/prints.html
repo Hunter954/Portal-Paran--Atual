@@ -1,0 +1,28 @@
+{% extends 'admin/layout.html' %}
+{% block admin_title %}Print automático{% endblock %}
+{% block page_title %}Print automático{% endblock %}
+{% block page_subtitle %}Comprovantes de publicidade do Paraná Atual{% endblock %}
+{% block admin_content %}
+{% if error %}<div class="alert alert-warning">{{ error }}</div>{% endif %}
+<div class="admin-grid-2">
+  <section class="panel-card">
+    <div class="panel-head"><div><h2>Capturas de publicidade</h2><p>Capturas diárias dos banners laterais com o horário real do registro.</p></div></div>
+    {% if captures %}
+    <dl><dt>Prints salvos</dt><dd>{{ captures.count }}</dd><dt>Última captura</dt><dd>{{ latest or 'Aguardando captura' }}</dd></dl>
+    {% endif %}
+    <a class="btn btn-outline-dark" href="{{ url_for('portal_tools.prints') }}">Atualizar status</a>
+  </section>
+  <section class="panel-card">
+    <div class="panel-head"><div><h2>Baixar relatório</h2><p>Reúna os prints do período em um arquivo Word.</p></div></div>
+    <form method="get" action="{{ url_for('portal_tools.prints_download') }}" class="vstack gap-3">
+      <label>Seção<select class="form-select mt-1" name="section">{% for key, label in sections.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
+      <div class="row g-3">
+        <label class="col-sm-6">Data inicial<input class="form-control mt-1" name="start" type="date" max="{{ today }}" value="{{ today }}" required></label>
+        <label class="col-sm-6">Data final<input class="form-control mt-1" name="end" type="date" max="{{ today }}" value="{{ today }}" required></label>
+      </div>
+      <div><button class="btn btn-dark">Baixar Word</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}
+

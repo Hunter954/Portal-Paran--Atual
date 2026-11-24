@@ -1,0 +1,34 @@
+{% extends 'admin/layout.html' %}
+{% block admin_title %}Estúdio de mídia{% endblock %}
+{% block page_title %}Estúdio de mídia{% endblock %}
+{% block page_subtitle %}Crie artes e vídeos com a identidade do Paraná Atual{% endblock %}
+{% block admin_content %}
+<div class="admin-grid-2" data-pa-studio data-logo="{{ url_for('static', filename='img/logo-parana-atual.svg') }}">
+  <section class="panel-card">
+    <form class="vstack gap-3" data-studio-form>
+      <label>Formato
+        <select class="form-select mt-1" name="format">
+          <option value="feed">Imagem para feed · 1080 × 1350</option>
+          <option value="story">Imagem para story · 1080 × 1920</option>
+          <option value="video">Vídeo vertical · 1080 × 1920</option>
+        </select>
+      </label>
+      <label>Manchete<textarea class="form-control mt-1" name="headline" rows="3" maxlength="180" required></textarea></label>
+      <label><span data-file-label>Imagem original</span><input class="form-control mt-1" name="source" type="file" accept="image/png,image/jpeg,image/webp" required></label>
+      <p class="small text-muted mb-0" data-studio-help>Escolha uma imagem de até 20 MB.</p>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <button type="submit" class="btn btn-dark">Gerar</button>
+        <a class="btn btn-outline-dark" data-studio-download hidden>Baixar arquivo</a>
+      </div>
+      <p class="small mb-0" data-studio-status role="status" aria-live="polite"></p>
+    </form>
+  </section>
+  <section class="panel-card text-center">
+    <h2 class="h6 text-start">Prévia</h2>
+    <canvas width="1080" height="1350" data-studio-preview aria-label="Prévia da arte" style="max-width:100%;max-height:70vh;width:auto;height:auto" hidden></canvas>
+    <video preload="metadata" playsinline data-studio-video hidden></video>
+  </section>
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/media-studio.js') }}" defer></script>{% endblock %}
+

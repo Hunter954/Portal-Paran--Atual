@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from .config import Config
 from .models import db, User, AdSlot, SiteSetting
 from .routes import site_bp
+from .portal_tools import bp as portal_tools_bp
 from .admin import admin_bp
 from .wp_client import WPClient
 from .sync import sync_categories, sync_posts
@@ -192,6 +193,7 @@ def create_app():
 
     app.register_blueprint(site_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(portal_tools_bp)
     app.register_blueprint(radar_bp)
     app.register_blueprint(radar_gateway_bp)
 

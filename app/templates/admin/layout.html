@@ -25,13 +25,17 @@
       <nav class="admin-nav">
         <a class="admin-nav-link {% if section=='dashboard' %}active{% endif %}" href="{{ url_for('admin.dashboard') }}"><i class="bi bi-speedometer2"></i><span>Visão geral</span></a>
         <a class="admin-nav-link {% if section=='posts' %}active{% endif %}" href="{{ url_for('admin.posts_list') }}"><i class="bi bi-newspaper"></i><span>Matérias</span></a>
-        <a class="admin-nav-link {% if section=='radar' %}active{% endif %}" href="{{ url_for('radar.index') }}"><i class="bi bi-broadcast"></i><span>Radar de Notícias</span></a>
+        <a class="admin-nav-link {% if section=='radar' and request.endpoint != 'radar.whatsapp' %}active{% endif %}" href="{{ url_for('radar.index') }}"><i class="bi bi-broadcast"></i><span>Radar de Notícias</span></a>
+        <a class="admin-nav-link {% if request.endpoint == 'radar.whatsapp' %}active{% endif %}" href="{{ url_for('radar.whatsapp') }}"><i class="bi bi-whatsapp"></i><span>WhatsApp</span></a>
         <a class="admin-nav-link {% if section=='import_parana_atual' %}active{% endif %}" href="{{ url_for('admin.importar_parana_atual') }}"><i class="bi bi-cloud-arrow-down"></i><span>Importar Paraná Atual</span></a>
         <a class="admin-nav-link {% if section=='categories' %}active{% endif %}" href="{{ url_for('admin.categories_list') }}"><i class="bi bi-tags"></i><span>Categorias</span></a>
         <a class="admin-nav-link {% if section=='users' %}active{% endif %}" href="{{ url_for('admin.users_list') }}"><i class="bi bi-people"></i><span>Usuários</span></a>
+        <a class="admin-nav-link {% if section=='media_studio' %}active{% endif %}" href="{{ url_for('portal_tools.media_studio') }}"><i class="bi bi-film"></i><span>Estúdio de mídia</span></a>
         <a class="admin-nav-link {% if section=='media' %}active{% endif %}" href="{{ url_for('admin.media_library') }}"><i class="bi bi-images"></i><span>Biblioteca de mídia</span></a>
         <a class="admin-nav-link {% if section=='insights' %}active{% endif %}" href="{{ url_for('admin.insights_page') }}"><i class="bi bi-graph-up-arrow"></i><span>Insights</span></a>
         <a class="admin-nav-link {% if section in ['settings'] %}active{% endif %}" href="{{ url_for('admin.settings_page') }}"><i class="bi bi-sliders"></i><span>Configurações / SEO</span></a>
+        <a class="admin-nav-link {% if section=='prints' %}active{% endif %}" href="{{ url_for('portal_tools.prints') }}"><i class="bi bi-camera"></i><span>Print automático</span></a>
+        <a class="admin-nav-link {% if section=='home_calendar' %}active{% endif %}" href="{{ url_for('portal_tools.calendar') }}"><i class="bi bi-calendar3-week"></i><span>Calendário da home</span></a>
         <a class="admin-nav-link {% if section=='footer_social' %}active{% endif %}" href="{{ url_for('admin.footer_social_page') }}"><i class="bi bi-share"></i><span>Rodapé / Social Media</span></a>
         <a class="admin-nav-link {% if section=='ads' %}active{% endif %}" href="{{ url_for('admin.ads_editor') }}"><i class="bi bi-badge-ad"></i><span>Publicidade</span></a>
       </nav>
