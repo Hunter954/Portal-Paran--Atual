@@ -111,11 +111,15 @@ def send_pending_alert():
 
 GROUP_ID = re.compile(r"\d{5,30}@g\.us")
 
-@bp.post("")
-def receive():
+def authorized_request():
     secret = os.getenv("RADAR_WHATSAPP_TOKEN")
     received = request.headers.get("Authorization", "")
-    if not secret or not hmac.compare_digest(received.encode(), ("Bearer " + secret).encode()):
+    return bool(secret and hmac.compare_digest(received.encode(), ("Bearer " + secret).encode()))
+
+
+@bp.post("")
+def receive():
+    if not authorized_request():
         abort(401)
     if request.content_length and request.content_length > 50000:
         abort(413)

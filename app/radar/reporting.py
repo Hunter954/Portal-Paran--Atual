@@ -53,6 +53,17 @@ def article_paragraphs(page, schema):
 
 
 def photo_candidates(page, url, schema):
+    image = schema.get("image")
+    for entry in image if isinstance(image, list) else [image]:
+        if isinstance(entry, dict) and isinstance(entry.get("url"), str) and isinstance(entry.get("creditText"), str):
+            caption = entry.get("caption")
+            license_url = entry.get("license")
+            compatible = isinstance(license_url, str) and re.fullmatch(
+                r"https?://creativecommons\.org/(?:licenses/by|publicdomain/(?:zero|mark))/(?:3\.0|4\.0|1\.0)/?",
+                license_url,
+            )
+            yield (urljoin(url, entry["url"]), clean(entry["creditText"]),
+                   clean(caption) if isinstance(caption, str) else "", license_url if compatible else None)
     for figure in page.select("article figure, main figure, .mc-article-body figure, figure.content-media-figure")[:12]:
         img, caption = figure.find(["img", "amp-img"]), figure.find("figcaption")
         if not img:
@@ -62,12 +73,7 @@ def photo_candidates(page, url, schema):
                                             flags=re.I) if re.search(r"(Foto|Imagem|Crédito)\s*:", caption, re.I) else (caption, "", "")
         reference = img.get("data-src") or img.get("data-original") or img.get("src")
         if reference and not reference.startswith("data:"):
-            yield urljoin(url, reference), clean(credit), clean(description)
-    image = schema.get("image")
-    for entry in image if isinstance(image, list) else [image]:
-        if isinstance(entry, dict) and isinstance(entry.get("url"), str) and isinstance(entry.get("creditText"), str):
-            caption = entry.get("caption")
-            yield urljoin(url, entry["url"]), clean(entry["creditText"]), clean(caption) if isinstance(caption, str) else ""
+            yield urljoin(url, reference), clean(credit), clean(description), None
 
 
 def image_extension(headers, body):
@@ -82,7 +88,7 @@ def image_extension(headers, body):
 
 
 def save_photo(fetcher, candidates):
-    for url, credit, description in candidates:
+    for url, credit, description, *licenses in candidates:
         if not credit:
             continue
         try:
@@ -109,7 +115,8 @@ def save_photo(fetcher, candidates):
         except OSError:
             return None
         return {"path": f"{current_app.config['MEDIA_URL_PREFIX'].rstrip('/')}/radar/{filename}",
-                "credit": credit[:255], "description": description[:500], "url": response.url[:1000]}
+                "credit": credit[:255], "description": description[:500], "url": response.url[:1000],
+                "license": licenses[0] if licenses else None}
     return None
 
 
@@ -128,7 +135,8 @@ def report_sources(sources):
         paragraphs = article_paragraphs(page, schema)
         if paragraphs:
             source["texto"] = "\n".join(paragraphs)[:(3300 if index == 0 else 1500)]
-            source["publicado"] = schema.get("datePublished") or source.get("publicado")
+            date = page.find("meta", attrs={"property": "article:published_time"})
+            source["publicado"] = schema.get("datePublished") or (date.get("content") if date else None) or source.get("publicado")
         if photo is None and index == 0:
             photo = save_photo(fetcher, photo_candidates(page, response.url, schema))
     return sources, photo

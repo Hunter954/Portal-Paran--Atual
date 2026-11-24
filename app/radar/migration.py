@@ -1,4 +1,5 @@
 import click
+from sqlalchemy import inspect, text
 
 from ..models import db
 from .models import Alert, Article, Audit, ChatCard, ChatDraftReply, ChatSession, Draft, DraftMedia, GroupDelivery, InboundMessage, Job, Run, Source, Story, WhatsAppPreference
@@ -10,6 +11,10 @@ TABLES = [model.__table__ for model in (Source, Run, Story, Article, Draft, Job,
 
 def upgrade():
     db.metadata.create_all(db.engine, tables=TABLES)
+    with db.engine.begin() as connection:
+        columns = inspect(connection).get_columns(DraftMedia.__tablename__)
+        if not any(column["name"] == "license" for column in columns):
+            connection.execute(text("ALTER TABLE radar_draft_media ADD COLUMN license VARCHAR(300)"))
 
 
 @click.group("radar")

@@ -23,7 +23,7 @@
     {% if post.featured_image %}
       <figure class="pa-article-figure">
         <img src="{{ post.featured_image }}" alt="{{ post.image_description or post.title|striptags }}">
-        <figcaption>{% if post.image_description %}<span>{{ post.image_description }}</span>{% endif %}{% if post.image_description and post.image_credit %} <span aria-hidden="true">—</span> {% endif %}<span>Foto: {{ post.image_credit or 'Divulgação' }}</span></figcaption>
+        {% if post.featured_image != '/static/img/logo-parana-atual.svg' %}<figcaption>{% if post.image_description %}<span>{{ post.image_description }}</span>{% endif %}{% if post.image_description and post.image_credit %} <span aria-hidden="true">—</span> {% endif %}<span>Foto: {{ post.image_credit or 'Divulgação' }}</span></figcaption>{% endif %}
       </figure>
     {% endif %}
 

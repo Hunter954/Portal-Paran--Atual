@@ -69,7 +69,9 @@ def draft_cards(story, draft, actor, group):
     full = (f"*Prévia · #{story.id}*\n\n*{draft.title}*\n"
             f"{draft.excerpt}\n\n{draft.body}\n\nFonte: {source.url}")
     if not photo:
-        full += "\nCapa: nenhuma foto da fonte foi localizada."
+        full += "\nCapa: arte do Paraná Atual."
+    elif not photo.license:
+        full += "\nFoto de referência. Se tiver autorização de uso, responda *FOTO AUTORIZADA* seguida de quem autorizou."
     if draft.pending:
         full += "\n\nA conferir: " + " · ".join(draft.pending[:2])
     confirmation = "Responda *PUBLICAR* ou *REFAZER* nesta mensagem."
@@ -181,6 +183,21 @@ def edit_draft(story, version, action, value, actor, group):
     return {"messages": draft_cards(story, result, actor, group)}
 
 
+def authorize_cover(story, card, raw, actor, group):
+    draft = latest_draft(story.id)
+    if not can_publish(actor) or not card or not draft or card.version != draft.version or story.state != "review":
+        raise EditorialError("Responda na prévia atual com *FOTO AUTORIZADA* e a origem da autorização.")
+    photo = db.session.get(DraftMedia, draft.id)
+    parts = raw.split(maxsplit=2)
+    reference = parts[2].strip() if len(parts) == 3 else ""
+    if not photo or not 3 <= len(reference) <= 250 or normalize(parts[1]) != "autorizada":
+        raise EditorialError("Informe quem autorizou a foto, por exemplo *FOTO AUTORIZADA Assessoria do evento*.")
+    values = {"titulo": draft.title, "resumo": draft.excerpt, "corpo": draft.body}
+    saved = save_draft(story, values, actor, photo={"path": photo.path, "credit": photo.credit,
+                      "description": photo.description, "url": photo.url, "license": reference})
+    audit("foto_autorizada", actor=actor, story=story.id, details=f"Versão {saved.version} · {reference}")
+    return {"messages": draft_cards(story, saved, actor, group)}
+
 def radar_status():
     total = Story.query.filter(Story.state.in_(OPEN_STATES)).count()
     urgent = Story.query.filter(Story.state.in_(OPEN_STATES), Story.score >= 75).count()
@@ -227,7 +244,7 @@ def radar_command(text, actor, group, quote_id=None):
     if action in {"fonte", "coletar"} or (plain == "fontes" and not quote_id):
         from .wa_actions import source_command
         return source_command(raw, actor)
-    if action not in {"ver", "fontes", "titulo", "resumo", "texto", "postar", "publicar", "confirmar", "aprovar", "gerar", "refazer",
+    if action not in {"ver", "fontes", "foto", "titulo", "resumo", "texto", "postar", "publicar", "confirmar", "aprovar", "gerar", "refazer",
                       "descartar", "restaurar", "apurar", "apurado", "agendar", "cancelar"}:
         return HELP
 
@@ -255,6 +272,8 @@ def radar_command(text, actor, group, quote_id=None):
     if editing:
         value = raw.split(maxsplit=1)[1]
         return edit_draft(story, card.version, action, value.strip(), actor, group)
+    if action == "foto":
+        return authorize_cover(story, card, raw, actor, group)
     if action == "apurado":
         latest = latest_draft(story.id)
         if not card or not latest or card.version != latest.version or story.state != "review":

@@ -109,6 +109,8 @@ class DraftMedia(db.Model):
     description = db.Column(db.String(500), nullable=False)
     url = db.Column(db.String(1000), nullable=False)
 
+    license = db.Column(db.String(300))
+
 
 class Job(db.Model):
     __tablename__ = "radar_jobs"

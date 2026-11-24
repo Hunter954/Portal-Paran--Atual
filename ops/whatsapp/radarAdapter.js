@@ -17,7 +17,16 @@ async function portalCover(value) {
     const url = new URL(value);
     if (url.origin !== 'https://paranaatual.com.br' || url.username || url.password ||
         !url.pathname.startsWith('/media/') || url.search || url.hash) return null;
-    const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(2500) });
+    let download = url;
+    const headers = {};
+    if (/^\/media\/radar\/[a-f0-9]{64}\.(?:jpg|png|webp)$/.test(url.pathname)) {
+      const webhook = process.env.RADAR_WHATSAPP_WEBHOOK;
+      const token = process.env.RADAR_WHATSAPP_TOKEN;
+      if (!webhook || !token) return null;
+      download = new URL(url.pathname, webhook);
+      headers.Authorization = 'Bearer ' + token;
+    }
+    const response = await fetch(download, { headers, redirect: 'error', signal: AbortSignal.timeout(2500) });
     const limit = 5 * 1024 * 1024;
     if (!response.ok || !/^image\/(?:jpeg|png|webp)(?:;|$)/i.test(response.headers.get('content-type') || '') ||
         Number(response.headers.get('content-length')) > limit || !response.body) return null;
@@ -152,7 +161,7 @@ export async function handleRadarMessage(message, text, reply, resolveAliases) {
   const root = /^\s*\/?menu\s*$/i.test(text || '');
   const radar = /^\s*RADAR(?:\s|$)/i.test(text || '');
   const consoleCommand = /^\s*(?:CMS|SEO|PUBLICIDADE|USU[ÁA]RIOS|INSIGHTS)(?:\s|$)/i.test(text || '');
-  const directAction = /^\s*(?:POSTAR|PUBLICAR|CONFIRMAR|VER|FONTES|GERAR|REFAZER|APROVAR|DESCARTAR|RESTAURAR|APURAR|APURADO|T[ÍI]TULO|TEXTO|RESUMO)(?:\s|$)/i.test(text || '');
+  const directAction = /^\s*(?:POSTAR|PUBLICAR|CONFIRMAR|VER|FONTES|FOTO|GERAR|REFAZER|APROVAR|DESCARTAR|RESTAURAR|APURAR|APURADO|T[ÍI]TULO|TEXTO|RESUMO)(?:\s|$)/i.test(text || '');
   const extra = /^\s*(?:[0-9]{1,4}|MAIS)\s*$/i.test(text || '');
   const stanza = message?.message?.extendedTextMessage?.contextInfo?.stanzaId;
   const quote = typeof stanza === 'string' && /^[A-Za-z0-9_-]{8,90}$/.test(stanza) ? stanza : undefined;

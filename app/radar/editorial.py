@@ -25,6 +25,7 @@ SYSTEM_PROMPT = (
     "sem listas e sem comentários sobre como a notícia foi feita. Use linguagem direta. "
     "Mantenha idade, valores, datas e os papéis de cada instituição fiéis ao relato: quem informou, "
     "quem decidiu e quem investigou são funções distintas. Não confunda data de publicação com data do fato. "
+    "Use datas como aparecem nos parágrafos e escreva graus ordinais por extenso. "
     "Trate suspeitas como suspeitas e atribua à autoridade que as levantou. Omita dados que a fonte não confirmou. "
     "Em fatos, informe o id da fonte e o número do parágrafo que sustenta os pontos centrais. "
     "Essas referências são internas. Em pendencias use [] se a notícia pode "
@@ -75,8 +76,8 @@ def save_draft(story, values, actor_id, *, model=None, photo=None):
     db.session.add(draft)
     db.session.flush()
     previous_media = db.session.get(DraftMedia, previous.id) if previous and not model else None
-    if previous_media:
-        photo = {name: getattr(previous_media, name) for name in ("path", "credit", "description", "url")}
+    if photo is None and previous_media:
+        photo = {name: getattr(previous_media, name) for name in ("path", "credit", "description", "url", "license")}
     if photo:
         db.session.add(DraftMedia(draft_id=draft.id, **photo))
     audit("rascunho_gerado" if model else "rascunho_editado", story=story.id, actor=actor_id,
@@ -107,7 +108,7 @@ def generate(sources):
         raise EditorialError("A reportagem completa não está acessível. O resumo do feed é insuficiente para publicar.")
     paragraphs = {source["id"]: source["texto"].splitlines() for source in sources if source.get("texto")}
     material = [
-        {"id": source["id"], "titulo": source["titulo"], "local": source["local"],
+        {"id": source["id"], "titulo": source["titulo"], "local": source["local"], "publicado": source.get("publicado"),
          "texto": {str(i): text for i, text in enumerate(paragraphs[source["id"]], 1)}}
         for source in sources if source["id"] in paragraphs
     ]
@@ -144,7 +145,15 @@ def generate(sources):
             raise
         raise EditorialError("O Ollama retornou uma resposta inválida.") from exc
     output = validate_draft(output, {x["id"] for x in sources})
-    source_numbers = set(re.findall(r"\d+", " ".join(s["titulo"] + " " + s.get("texto", "") for s in sources)))
+    original_text = " ".join(s["titulo"] + " " + s.get("texto", "") for s in sources)
+    source_numbers = set(re.findall(r"\d+", original_text))
+    for source in sources:
+        published = source.get("publicado")
+        if isinstance(published, str) and re.fullmatch(r"20\d{2}", published[:4]):
+            source_numbers.add(published[:4])
+    for word, number in (("primeiro", "1"), ("segundo", "2"), ("terceiro", "3")):
+        if re.search(rf"\b{word} grau\b", original_text, re.I):
+            source_numbers.add(number)
     draft_numbers = set(re.findall(r"\d+", " ".join(output[field] for field in ("titulo", "resumo", "corpo"))))
     if draft_numbers - source_numbers:
         raise EditorialError("A prévia menciona números ou datas que não aparecem na reportagem. Tente refazer a pauta.")
@@ -246,10 +255,12 @@ def publish(story, version, actor_id):
     if matches:
         raise EditorialError(f"Possível duplicidade com a matéria #{matches.id}. Consulte a matéria existente antes de publicar.")
     photo = db.session.get(DraftMedia, draft.id)
+    if photo and not photo.license:
+        photo = None
     category = Category.query.filter_by(name=story.category).first() if story.category else None
     post = Post(source="radar", source_url=originals[0], title=escape(draft.title),
                 slug=_ensure_unique_slug(Post, draft.title), excerpt=escape(draft.excerpt),
-                featured_image=photo.path if photo else None,
+                featured_image=photo.path if photo else "/static/img/logo-parana-atual.svg",
                 image_credit=photo.credit if photo else None,
                 image_description=photo.description if photo else None,
                 content_html=published_text(draft.body, story.articles),

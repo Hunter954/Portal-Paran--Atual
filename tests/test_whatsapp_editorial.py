@@ -111,13 +111,17 @@ def test_quote_postar_prepares_draft_sends_it_and_publishes_only_current_review(
     assert ChatCard.query.filter_by(message_id=updated["id"]).one().version == 2
     assert "mudou" in send("POSTAR", draft["id"]).json["reply"]
     assert Post.query.count() == 0
+    assert "Foto de referência" in updated["text"]
+    assert "Informe quem autorizou" in send("FOTO", updated["id"]).json["reply"]
+    authorized = send("FOTO AUTORIZADA Assessoria do evento", updated["id"]).json["messages"][-1]
+    assert "Foto de referência" not in authorized["text"]
     event = "MESSAGE_PUBLICAR_TESTE"
-    public = send("PUBLICAR", updated["id"], id=event).json["reply"]
+    public = send("PUBLICAR", authorized["id"], id=event).json["reply"]
     assert "publicada" in public and "https://paranaatual.com.br/p/" in public
     assert Post.query.one().source == "radar"
     assert Post.query.one().featured_image == photo["path"]
     assert Post.query.one().image_credit == photo["credit"]
-    assert send("PUBLICAR", updated["id"], id=event).json["reply"] is None
+    assert send("PUBLICAR", authorized["id"], id=event).json["reply"] is None
     assert Post.query.count() == 1
 
 
@@ -136,6 +140,7 @@ def test_private_quotes_are_scoped_and_pending_facts_appear_in_preview(portal, m
     assert "A conferir: Confirme quem organiza." in preview["text"]
     assert Post.query.count() == 0
     assert "publicada" in send("PUBLICAR", preview["id"]).json["reply"]
+    assert Post.query.one().featured_image == "/static/img/logo-parana-atual.svg"
 
 
 

@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from html import unescape, escape
 from pathlib import Path
+from posixpath import normpath
 import re
 import json
 
@@ -245,6 +246,18 @@ def inject_site_globals():
 @site_bp.get("/media/<path:filename>")
 def media(filename):
     media_root = Path(current_app.config["MEDIA_ROOT"]).resolve()
+    filename = normpath(filename)
+    if filename.startswith("radar/"):
+        from .radar.whatsapp import authorized_request
+        if not re.fullmatch(r"radar/[a-f0-9]{64}\.(jpg|png|webp)", filename):
+            abort(404)
+        if authorized_request():
+            response = send_from_directory(media_root, filename)
+            response.headers["Cache-Control"] = "private, no-store"
+            return response
+        path = "/media/" + filename
+        if not Post.query.filter(Post.featured_image == path, Post.published_at <= datetime.utcnow()).first():
+            abort(404)
     return send_from_directory(media_root, filename)
 
 

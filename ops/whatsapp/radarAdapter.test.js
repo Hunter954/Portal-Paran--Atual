@@ -11,6 +11,8 @@ test('passes selected group commands through the authenticated webhook and repli
   const received = [];
   const replies = [];
   const replyIds = [];
+  const covers = [];
+  const photoPath = '/media/radar/' + 'a'.repeat(64) + '.jpg';
   const cardId = '3EB0012345678901234567';
   const routes = { get() {}, post() {} };
   installRadarRoutes(routes, { store: { handles: id => id === selectedGroup } });
@@ -23,6 +25,8 @@ test('passes selected group commands through the authenticated webhook and repli
     response.writeHead(data.phone === '+' + administrator ? 200 : 403, { 'Content-Type': 'application/json' });
     const result = data.text === 'RADAR LISTAR 1'
       ? { reply: 'Pauta recente', messages: [{ id: cardId, text: 'Pauta #42' }] }
+      : data.text === 'POSTAR'
+      ? { messages: [{ text: 'Foto: Redação', cover: 'https://paranaatual.com.br' + photoPath }] }
       : { reply: 'Menu da redação' };
     response.end(JSON.stringify(result));
   }).listen(0, '127.0.0.1');
@@ -41,7 +45,7 @@ test('passes selected group commands through the authenticated webhook and repli
 
   const key = { remoteJid: selectedGroup, participant: '987654321@lid',
     participantAlt: administrator + ':2@s.whatsapp.net', fromMe: false, id: 'MENU_TEST_01' };
-  const reply = (text, id) => { replies.push(text); replyIds.push(id); };
+  const reply = (text, id, cover) => { replies.push(text); replyIds.push(id); covers.push(cover); };
   assert.equal(await handleRadarMessage({ key: { ...key, remoteJid: '87654321@g.us' } }, 'menu', reply), false);
   assert.equal(await handleRadarMessage({ key: { ...key, fromMe: true } }, 'menu', reply), false);
   assert.equal(await handleRadarMessage({ key }, 'menu', reply), true);
@@ -92,8 +96,19 @@ test('passes selected group commands through the authenticated webhook and repli
   assert.equal(replies.at(-1), 'Pauta #42');
   const quote = { key: { ...legacy, id: 'QUOTE_TEST_001' },
     message: { extendedTextMessage: { contextInfo: { stanzaId: cardId } } } };
+  const fetchOriginal = globalThis.fetch;
+  t.mock.method(globalThis, 'fetch', (url, options) => {
+    if (new URL(url).pathname !== photoPath) return fetchOriginal(url, options);
+    assert.equal(new URL(url).origin, new URL(fields.RADAR_WHATSAPP_WEBHOOK).origin);
+    assert.equal(options.headers.Authorization, 'Bearer qa-adapter-token');
+    return Promise.resolve(new Response(new Uint8Array([255, 216, 255]), { headers: { 'Content-Type': 'image/jpeg' } }));
+  });
   await handleRadarMessage(quote, 'POSTAR', reply);
   assert.equal(received.at(-1).quote_id, cardId);
   assert.equal(received.at(-1).text, 'POSTAR');
+  assert.equal(replies.at(-1), 'Foto: Redação');
+  assert.deepEqual(covers.at(-1), Buffer.from([255, 216, 255]));
+  await handleRadarMessage({ ...quote, key: { ...legacy, id: 'QUOTE_TEST_002' } }, 'PUBLICAR', reply);
+  assert.equal(received.at(-1).text, 'PUBLICAR');
 });
 
