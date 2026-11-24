@@ -21,7 +21,7 @@ Encerre o worker, restaure a imagem anterior do portal e preserve o backup. Mant
 
 O portal e o gateway foram atualizados como serviços Docker Swarm do Dokploy. As imagens de referência para rollback são `parana-atual-radar-base:6ea2ed4` para o portal e `127.0.0.1:5000/paranapop-trivox-whatsapp:foztotal-prints-20261123` para o gateway. O backup PostgreSQL validado está no host em `/root/parana-atual-radar-20261124/before-radar.pg.dump`.
 
-O worker `radar-parana-worker` e o Ollama `radar-parana-ollama` têm reinício automático e limites de CPU e memória. O Ollama usa `qwen3:1.7b` nesta VPS após o teste do modelo de 4B ultrapassar o tempo limite. O serviço usa rede interna para inferência. O Dokploy está configurado para a branch `radar-parana-atual` no portal e para a imagem `127.0.0.1:5000/paranapop-trivox-whatsapp:parana-atual-menu-20261124` no gateway, com as variáveis de integração registradas nos dois serviços.
+O worker `radar-parana-worker` e o Ollama `radar-parana-ollama` têm reinício automático e limites de CPU e memória. O Ollama usa `qwen3:1.7b` nesta VPS após o teste do modelo de 4B ultrapassar o tempo limite. O serviço usa rede interna para inferência. O Dokploy está configurado para a branch `radar-parana-atual` no portal e para a imagem `127.0.0.1:5000/paranapop-trivox-whatsapp:parana-atual-menu-jid-20261124` no gateway, com as variáveis de integração registradas nos dois serviços.
 
 Para retirar o Radar, pare `radar-parana-worker` e restaure as imagens anteriores dos serviços. Remova as configurações `RADAR_*` dos serviços ao restaurar o estado anterior. Use o backup apenas se houver necessidade de restaurar dados. O portal anterior funciona com as tabelas do Radar preservadas.
 

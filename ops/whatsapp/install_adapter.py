@@ -8,12 +8,45 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 SERVER_IMPORT = "import { installRadarRoutes } from './radarAdapter.js';"
 STORE_IMPORT = "import { createRadarGroups } from './radarGroups.js';"
-CLIENT_IMPORT = "import { handleRadarMessage } from './radarAdapter.js';"
+CLIENT_IMPORT = "import { getRadarAdminJids, handleRadarMessage } from './radarAdapter.js';"
+CLIENT_OLD_IMPORT = "import { handleRadarMessage } from './radarAdapter.js';"
+ALIASES_IMPORT = "import { createPortalAliasResolver } from './portalAliases.js';"
 ROUTES = """const radarStore = createRadarGroups(config, { getStatus, listGroups });
 await radarStore.load();
 installRadarRoutes(app, { getStatus, sendPrivate: sendLivoraPrivate, sendGroup: sendRadarGroup, store: radarStore });"""
-CLIENT_SWEEP = ("        if (await handleRadarMessage(message, text, value => replyMessage(remoteJid, value),"
-                " lid => socket.signalRepository?.lidMapping?.getPNForLID(lid))) continue;")
+SWEEP_V1 = "        if (await handleRadarMessage(message, text, value => replyMessage(remoteJid, value))) continue;"
+SWEEP_V2 = (
+    "        if (await handleRadarMessage(message, text, value => replyMessage(remoteJid, value),"
+    " lid => socket.signalRepository?.lidMapping?.getPNForLID(lid))) continue;"
+)
+CLIENT_SWEEP = """        const radarText = text || textFromMessage({ message: normalizeMessageContent(message?.message) });
+        if (await handleRadarMessage(message, radarText, value => replyMessage(remoteJid, value), resolveRadarSender)) continue;"""
+RESOLVE_SENDER = """const resolveRegisteredRadarAliases = createPortalAliasResolver({
+  loadAdminJids: getRadarAdminJids,
+  lookup: jid => sock ? sock.onWhatsApp(jid.split('@')[0]) : [],
+});
+
+async function resolveRadarSender(candidates, groupId) {
+  const aliases = [...candidates];
+  try {
+    const lid = aliases.find(id => id.endsWith('@lid'));
+    const phone = lid && await sock?.signalRepository?.lidMapping?.getPNForLID(lid);
+    if (phone) aliases.push(phone);
+    if (groupId) {
+      const member = await authorizeReportUser(aliases, groupId);
+      if (member) aliases.push(...member.aliases);
+    }
+  } catch {
+    // Ainda é possível identificar pelo cadastro e pela consulta oficial da sessão.
+  }
+  try {
+    return await resolveRegisteredRadarAliases(aliases);
+  } catch {
+    return aliases;
+  }
+}
+
+"""
 SEND_GROUP = """export async function sendRadarGroup(groupId, text, id, cover) {
   ensureConnected();
   const socket = sock;
@@ -45,13 +78,21 @@ def main():
         server_text = STORE_IMPORT + "\n" + server_text
         server_text = replace_once(server_text, "  sendLivoraPrivate,", "  sendLivoraPrivate,\n  sendRadarGroup,")
     if CLIENT_SWEEP not in client_text:
-        old = "        if (await handleRadarMessage(message, text, value => replyMessage(remoteJid, value))) continue;"
-        receive = "        const text = textFromMessage(message);"
-        if CLIENT_IMPORT not in client_text:
+        if CLIENT_OLD_IMPORT in client_text:
+            client_text = replace_once(client_text, CLIENT_OLD_IMPORT, CLIENT_IMPORT)
+        elif CLIENT_IMPORT not in client_text:
             client_text = CLIENT_IMPORT + "\n" + client_text
-            client_text = replace_once(client_text, receive, receive + "\n" + CLIENT_SWEEP)
+        for legacy in (SWEEP_V2, SWEEP_V1):
+            if legacy in client_text:
+                client_text = replace_once(client_text, legacy, CLIENT_SWEEP)
+                break
         else:
-            client_text = replace_once(client_text, old, CLIENT_SWEEP)
+            receive = "        const text = textFromMessage(message);"
+            client_text = replace_once(client_text, receive, receive + "\n" + CLIENT_SWEEP)
+        client_text = ALIASES_IMPORT + "\n" + client_text
+        client_text = replace_once(client_text, "  fetchLatestBaileysVersion,", "  fetchLatestBaileysVersion,\n  normalizeMessageContent,")
+        client_text = replace_once(client_text, "export async function startWhatsApp()", RESOLVE_SENDER + "export async function startWhatsApp()")
+    if "export async function sendRadarGroup(" not in client_text:
         client_text = replace_once(client_text, "export async function sendLivoraPrivate",
                                    SEND_GROUP + "\nexport async function sendLivoraPrivate")
     if "config.adminMenuParanaAtualGroupId" not in foz_text:

@@ -83,7 +83,43 @@ export function installRadarRoutes(app, { getStatus, sendPrivate, sendGroup, sto
   });
 }
 
-export async function handleRadarMessage(message, text, reply, resolvePhone) {
+export async function getRadarAdminJids() {
+  const base = process.env.PARANAATUAL_AD_REPORTS_URL;
+  const token = process.env.PARANAATUAL_AD_REPORTS_TOKEN;
+  if (!base || !token) return [];
+  const response = await fetch(base.replace(/\/+$/, '') + '/v1/admin-jids', {
+    headers: { Authorization: 'Bearer ' + token },
+    redirect: 'error', signal: AbortSignal.timeout(3000),
+  });
+  if (!response.ok) throw new Error('Cadastro de administradores indisponível.');
+  const data = await response.json();
+  return Array.isArray(data.jids) ? data.jids.filter(isPhoneJid) : [];
+}
+
+function senderIds(key, group) {
+  const knownPhone = group ? key.participantPn : key.senderPn;
+  const phone = typeof knownPhone === 'string' && /^[1-9]\d{7,14}$/.test(knownPhone)
+    ? knownPhone + '@s.whatsapp.net' : knownPhone;
+  const aliases = group ? [key.participant, key.participantAlt, key.participantLid]
+    : [key.remoteJid, key.remoteJidAlt, key.senderLid];
+  return [...new Set([phone, ...aliases].filter(value =>
+    /^\d+(?::\d+)?@(?:s\.whatsapp\.net|lid)$/.test(value || '')
+  ).map(value => value.replace(/:\d+(?=@)/, '')))];
+}
+
+async function boundedAliases(resolveAliases, candidates, groupId) {
+  let timer;
+  try {
+    return await Promise.race([
+      resolveAliases(candidates, groupId),
+      new Promise(resolve => { timer = setTimeout(() => resolve([]), 5500); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function handleRadarMessage(message, text, reply, resolveAliases) {
   const url = process.env.RADAR_WHATSAPP_WEBHOOK;
   const token = process.env.RADAR_WHATSAPP_TOKEN;
   const messageKey = message?.key || {};
@@ -92,47 +128,76 @@ export async function handleRadarMessage(message, text, reply, resolvePhone) {
   const radar = /^\s*RADAR(?:\s|$)/i.test(text || '');
   const menu = /^\s*\/?menu\s*$/i.test(text || '');
   const choice = /^\s*[1-9]\s*$/.test(text || '');
-  const groupCommand = menu || choice;
-  if (!url || !token || messageKey.fromMe ||
-      (group ? !(radar || groupCommand) || !groupStore?.handles(remote)
+  if (group && !text && message?.messageStubType === 2 && groupStore?.handles(remote)) {
+    console.info('Radar recebeu mensagem de grupo sem conteúdo descriptografado.');
+  }
+  if (!url || !token ||
+      (group ? !(radar || menu || choice) || !groupStore?.handles(remote)
         : !radar || !/@(?:lid|s\.whatsapp\.net)$/.test(remote))) return false;
+
+  if (messageKey.fromMe) {
+    if (group && menu) console.info('Radar menu recebido da conta vinculada.');
+    return false;
+  }
   const id = messageKey.id || '';
-  if (!/^[A-Za-z0-9_-]{8,90}$/.test(id) || text.length > 160) return true;
-  try {
-    const candidates = group ? [messageKey.participant, messageKey.participantAlt] : [remote, messageKey.remoteJidAlt];
-    let jid = candidates.find(isPhoneJid);
-    if (!jid && typeof resolvePhone === 'function') {
-      const lid = candidates.find(value => /^\d+(?::\d+)?@lid$/.test(value || ''));
-      if (lid) jid = await resolvePhone(lid);
+  if (!/^[A-Za-z0-9_-]{8,90}$/.test(id) || text.length > 160) {
+    if (group && menu) console.warn('Radar menu descartado por formato inválido.');
+    return true;
+  }
+
+  const candidates = senderIds(messageKey, group);
+  const sessionKeys = candidates.map(jid => remote + ':' + jid);
+  const current = Date.now();
+  if (group && choice && !sessionKeys.some(key => (menuSessions.get(key) || 0) > current)) return true;
+
+  let status;
+  const tried = new Set();
+  async function forward(jids) {
+    for (const jid of jids) {
+      if (!isPhoneJid(jid)) continue;
+      const phone = '+' + jid.split(/[:@]/)[0];
+      if (tried.has(phone) || tried.size >= 5) continue;
+      tried.add(phone);
+      const response = await fetch(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(5000),
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, id, text, ...(group ? { group_id: remote } : {}) }),
+      });
+      status = response.status;
+      if (status === 403) continue;
+      if (!response.ok) return null;
+      return response.json();
     }
-    if (!isPhoneJid(jid)) return true;
-    const phone = '+' + jid.split(/[:@]/)[0];
-    const sessionKey = remote + ':' + phone;
-    const current = Date.now();
-    if (group && choice && (menuSessions.get(sessionKey) || 0) <= current) return true;
-    const response = await fetch(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(5000),
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, id, text, ...(group ? { group_id: remote } : {}) }),
-    });
-    if (!response.ok) {
-      if (response.status >= 500) console.warn('Webhook do Radar indisponível.', response.status);
+    return null;
+  }
+
+  try {
+    let data = await forward(candidates);
+    if (!data && (status === undefined || status === 403) && candidates.length &&
+        typeof resolveAliases === 'function') {
+      const aliases = await boundedAliases(resolveAliases, candidates, group ? remote : null);
+      data = await forward(aliases);
+    }
+    if (!data) {
+      if (group && menu) console.info('Radar menu sem resposta.', status ?? 'remetente não identificado');
+      else if (status >= 500) console.warn('Webhook do Radar indisponível.', status);
       return true;
     }
-    const data = await response.json();
     if (typeof data.reply === 'string' && data.reply.length <= 6000 &&
         (!group || groupStore.handles(remote))) {
       if (group && (menu || choice)) {
-        if (menuSessions.size >= 500) {
-          for (const [entry, expiry] of menuSessions) if (expiry <= current) menuSessions.delete(entry);
-          if (menuSessions.size >= 500) menuSessions.delete(menuSessions.keys().next().value);
+        for (const key of sessionKeys) {
+          if (menuSessions.size >= 500) {
+            for (const [entry, expiry] of menuSessions) if (expiry <= current) menuSessions.delete(entry);
+            if (menuSessions.size >= 500) menuSessions.delete(menuSessions.keys().next().value);
+          }
+          menuSessions.set(key, current + 5 * 60 * 1000);
         }
-        menuSessions.set(sessionKey, current + 5 * 60 * 1000);
       }
       await reply(data.reply);
+      if (group && menu) console.info('Radar menu respondido.');
     }
   } catch (error) {
     console.warn('Falha ao processar comando do Radar.', error?.name || 'Error');
   }
   return true;
 }
-

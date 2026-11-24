@@ -60,12 +60,28 @@ test('passes selected group commands through the authenticated webhook and repli
   assert.equal(received.length, 4);
   assert.equal(replies.length, 3);
 
-  const onlyLid = { ...key, participantAlt: null, id: 'LID_TEST_001' };
-  await handleRadarMessage({ key: onlyLid }, 'RADAR AJUDA', reply, async lid => {
-    assert.equal(lid, key.participant);
-    return administrator + '@s.whatsapp.net';
-  });
+  // The installed Baileys version puts the phone in participantPn.
+  const legacy = { remoteJid: selectedGroup, participant: '987654321@lid',
+    participantPn: administrator + '@s.whatsapp.net', id: 'LEGACY_TEST_01' };
+  await handleRadarMessage({ key: legacy }, 'menu', reply);
   assert.equal(received[4].phone, '+' + administrator);
   assert.equal(replies.length, 4);
+
+  const onlyLid = { ...key, participantAlt: null, id: 'LID_TEST_001' };
+  await handleRadarMessage({ key: onlyLid }, 'RADAR AJUDA', reply, async lid => {
+    assert.deepEqual(lid, [key.participant]);
+    return [administrator + '@s.whatsapp.net'];
+  });
+  assert.equal(received[5].phone, '+' + administrator);
+  assert.equal(replies.length, 5);
+
+  const canonical = { ...legacy, participantPn: '554590000011@s.whatsapp.net', id: 'CANON_TEST_01' };
+  await handleRadarMessage({ key: canonical }, 'menu', reply, async (aliases, room) => {
+    assert.equal(room, selectedGroup);
+    assert.ok(aliases.includes('987654321@lid'));
+    return [...aliases, administrator + '@s.whatsapp.net'];
+  });
+  assert.deepEqual(received.slice(6).map(item => item.phone), ['+554590000011', '+' + administrator]);
+  assert.equal(replies.length, 6);
 });
 
