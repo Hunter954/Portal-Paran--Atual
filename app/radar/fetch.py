@@ -97,11 +97,14 @@ class PublicFetcher:
     def get(self, value, *, conditional=None):
         return self._get(value, conditional=conditional, check_robots=True)
 
-    def _get(self, value, *, conditional=None, check_robots=False):
+    def image(self, value):
+        return self._get(value, check_robots=True, image=True)
+
+    def _get(self, value, *, conditional=None, check_robots=False, image=False):
         url = public_url(value)
         for _ in range(5):
             if check_robots:
-                self._check_robots(url)
+                self._check_robots(url, image=image)
             response = self._request(url, conditional)
             location = response.headers.get("location")
             if response.status not in {301, 302, 303, 307, 308} or not location:
@@ -109,11 +112,14 @@ class PublicFetcher:
             url = public_url(urljoin(url, location))
         raise FetchError("A fonte retornou redirecionamentos demais.")
 
-    def _check_robots(self, url):
+    def _check_robots(self, url, *, image=False):
         parts = urlsplit(url)
         origin = f"{parts.scheme}://{parts.netloc}"
         if origin not in self.robots:
             response = self._get(origin + "/robots.txt")
+            if image and response.status == 400:
+                # Some image CDNs only serve paths shaped like an asset URL.
+                return
             if response.status not in {200, 404, 410}:
                 raise FetchError(f"Acesso ao robots.txt recusado (HTTP {response.status}).")
             rules = RobotFileParser()

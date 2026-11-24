@@ -63,7 +63,7 @@ def group_menu(text, actor, group, quote_id=None):
             return open_radar(actor, group)
         action = choices.get(plain)
         return action() if action else GROUP_MENU
-    if plain.split() and plain.split()[0] in {"postar", "confirmar", "ver", "fontes", "gerar", "apurar", "descartar", "apurado"}:
+    if plain.split() and plain.split()[0] in {"postar", "publicar", "confirmar", "ver", "fontes", "gerar", "refazer", "apurar", "descartar", "apurado"}:
         return radar_command(text, actor, group)
     return None
 

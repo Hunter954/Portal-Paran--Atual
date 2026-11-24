@@ -21,10 +21,14 @@ SWEEP_V2 = (
 )
 SWEEP_V3 = """        const radarText = text || textFromMessage({ message: normalizeMessageContent(message?.message) });
         if (await handleRadarMessage(message, radarText, value => replyMessage(remoteJid, value), resolveRadarSender)) continue;"""
-CLIENT_SWEEP = """        const radarMessage = { ...message, message: normalizeMessageContent(message?.message) };
+SWEEP_V4 = """        const radarMessage = { ...message, message: normalizeMessageContent(message?.message) };
         const radarText = text || textFromMessage(radarMessage);
         const radarReply = (value, id) => socket.sendMessage(remoteJid, { text: value }, id ? { messageId: id } : undefined);
         if (await handleRadarMessage(radarMessage, radarText, radarReply, resolveRadarSender)) continue;"""
+CLIENT_SWEEP = SWEEP_V4.replace(
+    "(value, id) => socket.sendMessage(remoteJid, { text: value },",
+    "(value, id, cover) => socket.sendMessage(remoteJid, cover ? { image: cover, caption: value } : { text: value },",
+)
 RESOLVE_SENDER = """const resolveRegisteredRadarAliases = createPortalAliasResolver({
   loadAdminJids: getRadarAdminJids,
   lookup: jid => sock ? sock.onWhatsApp(jid.split('@')[0]) : [],
@@ -86,7 +90,7 @@ def main():
             client_text = replace_once(client_text, CLIENT_OLD_IMPORT, CLIENT_IMPORT)
         elif CLIENT_IMPORT not in client_text:
             client_text = CLIENT_IMPORT + "\n" + client_text
-        for legacy in (SWEEP_V3, SWEEP_V2, SWEEP_V1):
+        for legacy in (SWEEP_V4, SWEEP_V3, SWEEP_V2, SWEEP_V1):
             if legacy in client_text:
                 client_text = replace_once(client_text, legacy, CLIENT_SWEEP)
                 break

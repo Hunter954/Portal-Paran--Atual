@@ -47,6 +47,7 @@ def tick(domains):
     job = Job.query.filter_by(state="pending").order_by(Job.id).first()
     if job:
         run_job(job)
+        send_pending_draft_reply()
     run = next_run()
     if run:
         domain = source_domain(run)

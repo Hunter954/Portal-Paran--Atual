@@ -40,8 +40,8 @@ A captura usa `PARANAATUAL_AD_REPORTS_URL` e `PARANAATUAL_AD_REPORTS_TOKEN`. Exe
 
 Digite MENU e escolha 9, ou use RADAR LISTAR 10. Cada pauta chega em uma mensagem pr?pria. Informe outra quantidade, use MAIS para continuar ou RADAR REENVIAR para repetir a consulta. RADAR URGENTES 10 filtra as pautas com pontua??o a partir de 75. Os alertas autom?ticos seguem o limite escolhido e a data de ativa??o, enquanto a listagem manual inclui o hist?rico aberto.
 
-Responda POSTAR na mensagem da pauta para preparar ou obter a pr?via. Confira o texto e as fontes recebidas. Responder POSTAR na pr?via ? a confirma??o da vers?o exata. Tamb?m ? poss?vel usar RADAR POSTAR ID e RADAR CONFIRMAR ID VERS?O. Responda T?TULO, RESUMO ou TEXTO seguido do conte?do na pr?via para editar. Use APURADO na pr?via quando tiver conferido e resolvido os pontos pendentes.
+Responda POSTAR na mensagem da pauta para receber a prévia. O worker lê a reportagem completa e procura a foto creditada no artigo. A foto aparece na conversa e vira capa ao publicar. Na prévia responda PUBLICAR para confirmar ou REFAZER para gerar outro texto. TÍTULO, RESUMO e TEXTO continuam disponíveis para edições pontuais. A prévia e a capa são associadas à versão atual da pauta.
 
-A migra??o cria radar_chat_sessions, radar_chat_cards e radar_chat_draft_replies. A configura??o do grupo e os alertas permanecem no gateway existente. A publica??o conserva as permiss?es definidas em RADAR_PUBLISHER_IDS e as verifica??es de duplicidade do Radar.
+A migra??o cria radar_chat_sessions, radar_chat_cards, radar_chat_draft_replies e radar_draft_media. A configura??o do grupo e os alertas permanecem no gateway existente. A publica??o conserva as permiss?es definidas em RADAR_PUBLISHER_IDS e as verifica??es de duplicidade do Radar.
 
 Use RADAR FONTES para listar o cat?logo, RADAR FONTE ADICIONAR nome | URL | tipo para cadastrar e RADAR COLETAR ID para solicitar uma coleta. Para agendar, responda RADAR AGENDAR DD/MM/AAAA HH:MM na pr?via revisada, no hor?rio de Bras?lia. RADAR CANCELAR ID devolve uma pauta agendada ? revis?o.

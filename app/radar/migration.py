@@ -1,11 +1,11 @@
 import click
 
 from ..models import db
-from .models import Alert, Article, Audit, ChatCard, ChatDraftReply, ChatSession, Draft, GroupDelivery, InboundMessage, Job, Run, Source, Story, WhatsAppPreference
+from .models import Alert, Article, Audit, ChatCard, ChatDraftReply, ChatSession, Draft, DraftMedia, GroupDelivery, InboundMessage, Job, Run, Source, Story, WhatsAppPreference
 
 
 TABLES = [model.__table__ for model in (Source, Run, Story, Article, Draft, Job, Audit, WhatsAppPreference, Alert, InboundMessage, GroupDelivery,
-                                             ChatSession, ChatCard, ChatDraftReply)]
+                                             ChatSession, ChatCard, ChatDraftReply, DraftMedia)]
 
 
 def upgrade():

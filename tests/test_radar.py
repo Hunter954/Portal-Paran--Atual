@@ -187,6 +187,36 @@ def test_generated_draft_rejects_invented_attribution():
                         "fatos": [{"texto": "Citação", "fonte": 2}]}, {1})
 
 
+def test_reporting_prefers_credited_amp_photo_to_generic_share_image(portal, monkeypatch, tmp_path):
+    from app.radar.reporting import report_sources
+
+    app, _ = portal
+    app.config["MEDIA_ROOT"] = str(tmp_path)
+    url, photo_url = "https://fonte.com.br/noticia", "https://fotos.com.br/guarapuava.jpg"
+    html = """
+      <meta property="og:image" content="https://fonte.com.br/logo.png">
+      <article>
+        <p>O incêndio atingiu um imóvel no distrito de Palmeirinha, em Guarapuava. Os bombeiros atenderam à ocorrência.</p>
+        <p>✅ Siga o canal do site no WhatsApp para receber as notícias diretamente no aplicativo.</p>
+        <figure class="content-media-figure">
+          <amp-img src="https://fotos.com.br/guarapuava.jpg"></amp-img>
+          <figcaption>1 de 3 Casa atingida pelo incêndio — Foto: Equipe local</figcaption>
+        </figure>
+      </article>
+    """
+    responses = {
+        url: Response(url, 200, {"content-type": "text/html"}, html.encode()),
+        photo_url: Response(photo_url, 200, {"content-type": "image/jpeg"}, b"\xff\xd8\xffsample"),
+    }
+    monkeypatch.setattr("app.radar.reporting.PublicFetcher.get", lambda _self, url: responses[url])
+    monkeypatch.setattr("app.radar.reporting.PublicFetcher.image", lambda _self, url: responses[url])
+    sources, photo = report_sources([{"url": url, "resumo": "Resumo do feed já disponível."}])
+    assert "Palmeirinha" in sources[0]["texto"] and "WhatsApp" not in sources[0]["texto"]
+    assert photo["credit"] == "Equipe local" and photo["description"] == "Casa atingida pelo incêndio"
+    assert photo["url"] == photo_url
+    assert (tmp_path / photo["path"].removeprefix("/media/")).read_bytes() == responses[photo_url].body
+
+
 
 def test_site_listing_checks_origin():
     from bs4 import BeautifulSoup

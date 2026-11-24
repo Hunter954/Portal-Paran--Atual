@@ -77,16 +77,18 @@ export function installRadarRoutes(app, { getStatus, sendPrivate, sendGroup, sto
     const isCurrent = () => store.handles(group_id) && store.state().revision === revision;
     if (!isCurrent()) return res.status(409).json({ message: 'O grupo do Radar mudou.' });
     if (!validDelivery(messages)) return res.sendStatus(400);
-    for (const { text, id } of messages) {
-      if (!isCurrent() || !await sendGroup(group_id, text, id)) return res.json({ accepted: false });
+    for (const { text, id, cover } of messages) {
+      const image = await portalCover(cover);
+      if (!isCurrent() || !await sendGroup(group_id, text, id, image)) return res.json({ accepted: false });
     }
     return res.json({ accepted: true });
   }));
   app.post('/radar/reply', authorize, action(async (req, res) => {
     const { phone, messages } = req.body || {};
     if (!phonePattern.test(phone || '') || !validDelivery(messages)) return res.sendStatus(400);
-    for (const { text, id } of messages) {
-      if (!await sendPrivate(phone, { text }, id)) return res.json({ accepted: false });
+    for (const { text, id, cover } of messages) {
+      const image = await portalCover(cover);
+      if (!await sendPrivate(phone, image ? { image, caption: text } : { text }, id)) return res.json({ accepted: false });
     }
     return res.json({ accepted: true });
   }));
@@ -150,7 +152,7 @@ export async function handleRadarMessage(message, text, reply, resolveAliases) {
   const root = /^\s*\/?menu\s*$/i.test(text || '');
   const radar = /^\s*RADAR(?:\s|$)/i.test(text || '');
   const consoleCommand = /^\s*(?:CMS|SEO|PUBLICIDADE|USU[ÁA]RIOS|INSIGHTS)(?:\s|$)/i.test(text || '');
-  const directAction = /^\s*(?:POSTAR|CONFIRMAR|VER|FONTES|GERAR|APROVAR|DESCARTAR|RESTAURAR|APURAR|APURADO|T[ÍI]TULO|TEXTO|RESUMO)(?:\s|$)/i.test(text || '');
+  const directAction = /^\s*(?:POSTAR|PUBLICAR|CONFIRMAR|VER|FONTES|GERAR|REFAZER|APROVAR|DESCARTAR|RESTAURAR|APURAR|APURADO|T[ÍI]TULO|TEXTO|RESUMO)(?:\s|$)/i.test(text || '');
   const extra = /^\s*(?:[0-9]{1,4}|MAIS)\s*$/i.test(text || '');
   const stanza = message?.message?.extendedTextMessage?.contextInfo?.stanzaId;
   const quote = typeof stanza === 'string' && /^[A-Za-z0-9_-]{8,90}$/.test(stanza) ? stanza : undefined;
@@ -216,9 +218,10 @@ export async function handleRadarMessage(message, text, reply, resolveAliases) {
             entry.text.length <= 3500 && (entry.id === undefined || messageId.test(entry.id))) outgoing.push(entry);
       }
     }
-    for (const { text: responseText, id: responseId } of outgoing) {
+    for (const { text: responseText, id: responseId, cover } of outgoing) {
+      const image = await portalCover(cover);
       if (group && !groupStore.handles(remote)) break;
-      await reply(responseText, responseId);
+      await reply(responseText, responseId, image);
     }
     if (group && root && outgoing.length) console.info('Radar menu respondido.');
   } catch (error) {

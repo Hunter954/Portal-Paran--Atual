@@ -7,9 +7,9 @@ from secrets import token_hex
 from sqlalchemy import select
 
 from ..models import Post, db
-from .editorial import EditorialError, can_publish, latest_draft, lock_story, publish, queue_draft, save_draft
+from .editorial import PROMPT_VERSION, EditorialError, can_publish, latest_draft, lock_story, publish, queue_draft, save_draft
 from .geography import normalize
-from .models import ChatCard, ChatDraftReply, ChatSession, Story, audit, now
+from .models import ChatCard, ChatDraftReply, ChatSession, Draft, DraftMedia, Story, audit, now
 
 
 OPEN_STATES = ("new", "research", "production", "review")
@@ -19,9 +19,8 @@ HELP = (
     "Quantas pautas você quer receber? Digite um número, como *10*, ou *RADAR LISTAR 10*.\n"
     "Use *MAIS* para continuar, *RADAR REENVIAR* para receber a lista novamente ou "
     "*RADAR URGENTES 10* para filtrar.\n"
-    "Deslize uma pauta para responder *POSTAR*. Quando receber o rascunho, revise e responda "
-    "*POSTAR* na própria prévia para publicar aquela versão.\n"
-    "Também pode digitar *RADAR VER 92*, *RADAR POSTAR 92* ou *RADAR STATUS*."
+    "Responda *POSTAR* numa pauta para receber a prévia. Na prévia, *PUBLICAR* coloca a matéria no ar "
+    "e *REFAZER* pede outro texto."
 )
 
 
@@ -57,23 +56,25 @@ def story_card(story, actor, group):
     }.get(story.state, story.state)
     text = (f"*Pauta #{story.id} · {label}*\n{story.title}\n"
             f"{story.location} · {story.score}/100 · {article.source.name}\n"
-            f"{summary}\n\nResponda *POSTAR* ou *VER* nesta mensagem.")
+            f"{summary}\n\nResponda *POSTAR* para abrir a prévia.")
     return reply_card(story, text, actor, group)
 
 
 def draft_cards(story, draft, actor, group):
-    source_list = "\n".join(f"• {a.source.name}: {a.url}" for a in story.articles[:3])
-    pending = "\n".join(f"• {item}" for item in draft.pending[:4])
-    full = (f"*Prévia da pauta #{story.id} · versão {draft.version}*\n\n*{draft.title}*\n"
-            f"{draft.excerpt}\n\n{draft.body}\n\n*Fontes*\n{source_list}")
-    if pending:
-        full += f"\n\n*Pontos para conferir*\n{pending}"
-    confirmation = (f"*Pauta #{story.id} · versão {draft.version}*\n"
-                    "Responda *POSTAR* nesta prévia para confirmar ou *TÍTULO novo título*, "
-                    "*RESUMO novo resumo* ou *TEXTO novo texto* para editar.\n"
-                    f"Também pode digitar *RADAR CONFIRMAR {story.id} {draft.version}*.")
+    from .group_delivery import PUBLIC_URL
+    photo = db.session.get(DraftMedia, draft.id)
+    images = [{"text": f"Foto: {photo.credit}" + (f"\n{photo.description}" if photo.description else ""),
+               "cover": PUBLIC_URL + photo.path}] if photo else []
+    source = story.articles[0]
+    full = (f"*Prévia · #{story.id}*\n\n*{draft.title}*\n"
+            f"{draft.excerpt}\n\n{draft.body}\n\nFonte: {source.url}")
+    if not photo:
+        full += "\nCapa: nenhuma foto da fonte foi localizada."
+    if draft.pending:
+        full += "\n\nA conferir: " + " · ".join(draft.pending[:2])
+    confirmation = "Responda *PUBLICAR* ou *REFAZER* nesta mensagem."
     if len(full) + len(confirmation) + 2 <= 3100:
-        return [reply_card(story, full + "\n\n" + confirmation, actor, group, draft)]
+        return [*images, reply_card(story, full + "\n\n" + confirmation, actor, group, draft)]
     chunks = []
     remaining = full
     while remaining:
@@ -82,7 +83,7 @@ def draft_cards(story, draft, actor, group):
         size = boundary if len(remaining) > 3000 and boundary > 1600 else len(candidate)
         chunks.append({"text": remaining[:size]})
         remaining = remaining[size:].lstrip()
-    return [*chunks, reply_card(story, confirmation, actor, group, draft)]
+    return [*images, *chunks, reply_card(story, confirmation, actor, group, draft)]
 
 
 def open_radar(actor, group):
@@ -128,19 +129,25 @@ def quoted_card(quote_id, actor, group):
     return card
 
 
+def legacy_draft(draft):
+    origin = Draft.query.filter(Draft.story_id == draft.story_id, Draft.version <= draft.version,
+                                Draft.model.isnot(None)).order_by(Draft.version.desc()).first()
+    return bool(origin and not origin.model.endswith(":" + PROMPT_VERSION))
+
+
 def request_draft(story, actor, group, *, fresh=False):
     latest = latest_draft(story.id)
-    if latest and story.state == "review" and not fresh:
+    if latest and story.state == "review" and not fresh and not legacy_draft(latest):
         return {"messages": draft_cards(story, latest, actor, group)}
     job = queue_draft(story, actor)
     db.session.flush()
     previous = ChatDraftReply.query.filter_by(job_id=job.id, actor_id=actor, scope=group or "").first()
     if not previous:
         db.session.add(ChatDraftReply(job_id=job.id, actor_id=actor, scope=group or ""))
-    return f"Vou preparar a pauta *#{story.id}*. A prévia chega nesta conversa para você revisar e publicar."
+    return f"Estou lendo a reportagem e buscando a foto da pauta *#{story.id}*. A prévia chega aqui em alguns minutos."
 
 
-def confirm_story(story, version, actor):
+def confirm_story(story, version, actor, group=None):
     existing = db.session.get(Post, story.post_id) if story.post_id else None
     if existing:
         from .group_delivery import post_url
@@ -150,8 +157,8 @@ def confirm_story(story, version, actor):
         raise EditorialError("Essa prévia mudou ou saiu da fila de revisão. Responda *VER* para receber a versão atual.")
     if not any(article.evidence for article in story.articles):
         raise EditorialError("A pauta precisa de uma fonte com o vínculo documentado com o Paraná.")
-    if latest.pending:
-        raise EditorialError("A prévia tem pontos de apuração pendentes. Depois de conferir as fontes, responda *APURADO* na prévia.")
+    if legacy_draft(latest):
+        return request_draft(story, actor, group, fresh=True)
     with db.session.begin_nested():
         story.approved_draft_id = latest.id
         post = publish(story, version, actor)
@@ -220,15 +227,15 @@ def radar_command(text, actor, group, quote_id=None):
     if action in {"fonte", "coletar"} or (plain == "fontes" and not quote_id):
         from .wa_actions import source_command
         return source_command(raw, actor)
-    if action not in {"ver", "fontes", "titulo", "resumo", "texto", "postar", "confirmar", "aprovar", "gerar",
+    if action not in {"ver", "fontes", "titulo", "resumo", "texto", "postar", "publicar", "confirmar", "aprovar", "gerar", "refazer",
                       "descartar", "restaurar", "apurar", "apurado", "agendar", "cancelar"}:
         return HELP
 
     card = quoted_card(quote_id, actor, group)
     target = re.fullmatch(r"(?:#?(?:pa-)?)?([0-9]{1,9})", words[1]) if len(words) > 1 else None
     editing = card and card.version is not None and action in {"titulo", "resumo", "texto"} and len(words) > 1
-    if card and len(words) > 1 and action in {"postar", "confirmar"}:
-        return "Responda apenas *POSTAR* na prévia que você quer publicar."
+    if card and len(words) > 1 and action in {"postar", "publicar", "confirmar"}:
+        return "Responda apenas *PUBLICAR* na prévia que você quer publicar."
     story_id = card.story_id if card else (int(target[1]) if target else None)
     if not story_id:
         return "Responda em uma pauta recebida ou informe o ID. Exemplo: *RADAR POSTAR 92*."
@@ -259,21 +266,20 @@ def radar_command(text, actor, group, quote_id=None):
     if action == "fontes":
         return "\n".join(f"{a.source.name}\n{a.url}" for a in story.articles[:5])
     if action in {"ver", "resumo"}:
-        latest = latest_draft(story.id)
-        if latest and story.state == "review":
-            return {"messages": draft_cards(story, latest, actor, group)}
+        if story.state in OPEN_STATES:
+            return request_draft(story, actor, group)
         return {"messages": [story_card(story, actor, group)]}
-    if action in {"postar", "confirmar"}:
+    if action in {"postar", "publicar", "confirmar"}:
         if card and card.version is not None:
-            return confirm_story(story, card.version, actor)
+            return confirm_story(story, card.version, actor, group)
         if action == "confirmar":
             if target and len(words) == 3 and re.fullmatch(r"[0-9]{1,6}", words[2]):
-                return confirm_story(story, int(words[2]), actor)
-            return "Confirme respondendo *POSTAR* na prévia da versão que você revisou."
+                return confirm_story(story, int(words[2]), actor, group)
+            return "Responda *PUBLICAR* na prévia."
         if story.post_id:
-            return confirm_story(story, 0, actor)
+            return confirm_story(story, 0, actor, group)
         return request_draft(story, actor, group)
-    if action == "gerar":
+    if action in {"gerar", "refazer"}:
         return request_draft(story, actor, group, fresh=True)
     if action == "restaurar" and story.state == "discarded":
         story.state = story.previous_state or "new"

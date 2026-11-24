@@ -69,8 +69,9 @@ def schedule_from_preview(story, card, raw, actor):
     draft = latest_draft(story.id)
     if not card or not draft or card.version != draft.version or story.state != "review":
         raise EditorialError("Responda na prévia da versão atual com *RADAR AGENDAR DD/MM/AAAA HH:MM*.")
-    if draft.pending:
-        raise EditorialError("Confira os pontos pendentes e responda *APURADO* antes de agendar.")
+    from .wa_editorial import legacy_draft, request_draft
+    if legacy_draft(draft):
+        return request_draft(story, actor, card.scope, fresh=True)
     if not can_publish(actor):
         raise EditorialError("Este administrador não pode agendar publicações.")
     try:

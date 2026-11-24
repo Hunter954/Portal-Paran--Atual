@@ -21,6 +21,7 @@ def provision(portal, monkeypatch):
     group = {"connected": True, "enabled": True, "available": True, "group_id": GROUP,
              "revision": "r1", "alerts": True, "minimum": 75}
     monkeypatch.setattr("app.radar.whatsapp.gateway", lambda *_a, **_k: group)
+    monkeypatch.setattr("app.radar.editorial.report_sources", lambda sources: (sources, None))
     client = app.test_client()
     headers = {"Authorization": "Bearer qa-token"}
     sent = 0
@@ -77,13 +78,16 @@ def test_quote_postar_prepares_draft_sends_it_and_publishes_only_current_review(
     article = Article.query.one()
     original = send("RADAR LISTAR 1").json["messages"][0]
     result = send("POSTAR", original["id"]).json
-    assert "preparar a pauta" in result["reply"]
+    assert "lendo a reportagem" in result["reply"]
     assert Post.query.count() == 0
     request = ChatDraftReply.query.one()
     assert Job.query.one().state == "pending"
     monkeypatch.setattr("app.radar.editorial.generate", lambda sources: {
         "titulo": "Feira em Curitiba", "resumo": "Aulas gratuitas", "corpo": "A programação terá aulas.",
         "fatos": [{"fonte": article.id, "texto": "Aulas gratuitas"}], "pendencias": []})
+    photo = {"path": "/media/radar/capa.jpg", "credit": "Fotógrafa", "description": "Feira no centro",
+             "url": "https://fonte.example.org/capa.jpg"}
+    monkeypatch.setattr("app.radar.editorial.report_sources", lambda sources: (sources, photo))
     run_job(Job.query.one())
     monkeypatch.setattr("app.radar.wa_delivery.enabled", lambda: True)
     monkeypatch.setattr("app.radar.wa_delivery.group_settings", lambda: group)
@@ -100,36 +104,38 @@ def test_quote_postar_prepares_draft_sends_it_and_publishes_only_current_review(
     send_pending_draft_reply()
     assert len(deliveries) == 1 and request.state == "sent"
     draft = deliveries[0][-1]
-    assert "versão 1" in draft["text"] and "POSTAR" in draft["text"]
+    assert "PUBLICAR" in draft["text"] and "REFAZER" in draft["text"]
+    assert deliveries[0][0]["cover"] == "https://paranaatual.com.br/media/radar/capa.jpg"
     assert ChatCard.query.filter_by(message_id=draft["id"]).one().version == 1
     updated = send("TÍTULO Oficina em Curitiba", draft["id"]).json["messages"][-1]
-    assert "versão 2" in updated["text"]
+    assert ChatCard.query.filter_by(message_id=updated["id"]).one().version == 2
     assert "mudou" in send("POSTAR", draft["id"]).json["reply"]
     assert Post.query.count() == 0
     event = "MESSAGE_PUBLICAR_TESTE"
-    public = send("POSTAR", updated["id"], id=event).json["reply"]
+    public = send("PUBLICAR", updated["id"], id=event).json["reply"]
     assert "publicada" in public and "https://paranaatual.com.br/p/" in public
     assert Post.query.one().source == "radar"
-    assert send("POSTAR", updated["id"], id=event).json["reply"] is None
+    assert Post.query.one().featured_image == photo["path"]
+    assert Post.query.one().image_credit == photo["credit"]
+    assert send("PUBLICAR", updated["id"], id=event).json["reply"] is None
     assert Post.query.count() == 1
 
 
-def test_private_quotes_are_scoped_and_pending_facts_require_apuracao(portal, monkeypatch):
+def test_private_quotes_are_scoped_and_pending_facts_appear_in_preview(portal, monkeypatch):
     send, _ = provision(portal, monkeypatch)
     seed(1)
     group_card = send("RADAR LISTAR 1").json["messages"][0]
     assert "informe o ID" in send("POSTAR", group_card["id"], group_id=None).json["reply"]
     assert send("POSTAR", group_card["id"], phone="+5545990000022").status_code == 403
-    assert "preparar a pauta" in send("POSTAR", group_card["id"]).json["reply"]
+    assert "lendo a reportagem" in send("POSTAR", group_card["id"]).json["reply"]
     monkeypatch.setattr("app.radar.editorial.generate", lambda sources: {
         "titulo": "Seminário em Curitiba", "resumo": "Rubrica", "corpo": "Aulas gratuitas.",
         "fatos": [], "pendencias": ["Confirme quem organiza."]})
     run_job(Job.query.one())
     preview = send(f"RADAR VER {Story.query.one().id}").json["messages"][-1]
-    assert "pontos de apuração" in send("POSTAR", preview["id"]).json["reply"]
+    assert "A conferir: Confirme quem organiza." in preview["text"]
     assert Post.query.count() == 0
-    reviewed = send("APURADO", preview["id"]).json["messages"][-1]
-    assert "publicada" in send("POSTAR", reviewed["id"]).json["reply"]
+    assert "publicada" in send("PUBLICAR", preview["id"]).json["reply"]
 
 
 

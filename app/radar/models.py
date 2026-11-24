@@ -100,6 +100,16 @@ class Draft(db.Model):
     model = db.Column(db.String(100))
 
 
+class DraftMedia(db.Model):
+    __tablename__ = "radar_draft_media"
+
+    draft_id = db.Column(db.ForeignKey("radar_drafts.id", ondelete="CASCADE"), primary_key=True)
+    path = db.Column(db.String(800), nullable=False)
+    credit = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.String(500), nullable=False)
+    url = db.Column(db.String(1000), nullable=False)
+
+
 class Job(db.Model):
     __tablename__ = "radar_jobs"
 

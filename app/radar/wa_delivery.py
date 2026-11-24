@@ -44,8 +44,9 @@ def send_pending_draft_reply():
     if job.state == "done" and draft and story.state == "review":
         messages = draft_cards(story, draft, item.actor_id, item.scope)
     elif job.state == "error":
-        messages = [{"text": f"Não consegui preparar a pauta *#{story.id}*.\n{job.error or 'A geração falhou.'}\n"
-                             f"Digite *RADAR GERAR {story.id}* para tentar novamente."}]
+        from .wa_editorial import reply_card
+        messages = [reply_card(story, f"Pauta *#{story.id}*\n{job.error or 'A geração falhou.'}\n"
+                               "Responda *REFAZER* para tentar novamente.", item.actor_id, item.scope)]
     else:
         item.state = "cancelled"
         db.session.commit()
