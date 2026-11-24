@@ -146,6 +146,12 @@
     download.hidden = true;
   });
 
+  const initialFormat = new URLSearchParams(window.location.search).get('formato');
+  if (['feed', 'story', 'video'].includes(initialFormat)) {
+    format.value = initialFormat;
+    format.dispatchEvent(new Event('change'));
+  }
+
   form.addEventListener('submit', async event => {
     event.preventDefault();
     const file = source.files[0];

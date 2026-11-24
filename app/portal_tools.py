@@ -148,3 +148,8 @@ def prints_download():
 @bp.get("/estudio")
 def media_studio():
     return screen("media_studio", "media_studio")
+
+
+@bp.get("/whatsapp")
+def whatsapp_panel():
+    return redirect(url_for("radar.whatsapp"))

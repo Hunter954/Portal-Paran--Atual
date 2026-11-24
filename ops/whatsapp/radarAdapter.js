@@ -91,7 +91,7 @@ export async function handleRadarMessage(message, text, reply, resolvePhone) {
   const group = remote.endsWith('@g.us');
   const radar = /^\s*RADAR(?:\s|$)/i.test(text || '');
   const menu = /^\s*\/?menu\s*$/i.test(text || '');
-  const choice = /^\s*[1-5]\s*$/.test(text || '');
+  const choice = /^\s*[1-9]\s*$/.test(text || '');
   const groupCommand = menu || choice;
   if (!url || !token || key.fromMe ||
       (group ? !(radar || groupCommand) || !groupStore?.handles(remote)

@@ -167,33 +167,40 @@ def receive():
 
 GROUP_MENU = (
     "*Paraná Atual · Menu da redação*\n\n"
-    "1 — Pautas do Radar\n2 — Alertas urgentes\n3 — Últimas matérias\n"
-    "4 — Painel e serviços\n5 — Comandos do Radar\n\n"
+    "1 — Visão geral\n2 — Matérias\n3 — Usuários\n4 — Insights\n"
+    "5 — Configurações e SEO\n6 — Publicidade e prints\n7 — Arte para redes sociais\n"
+    "8 — Vídeo vertical\n9 — Radar de Notícias\n\n"
     "Digite uma opção ou RADAR AJUDA."
 )
 
 
 def group_menu(text, actor):
+    portal = "https://paranaatual.com.br"
     if text in {"menu", "/menu"}:
         return GROUP_MENU
     if text == "1":
-        return command("radar pendentes", actor)
+        posts = Post.query.filter(Post.published_at <= now()).count()
+        new = Story.query.filter_by(state="new").count()
+        return f"{posts} matérias publicadas · {new} pautas para analisar\nPainel: {portal}/admin/"
     if text == "2":
-        return command("radar urgentes", actor)
-    if text == "3":
         from .group_delivery import post_url
 
-        posts = Post.query.filter(Post.published_at <= now()).order_by(Post.published_at.desc()).limit(5)
-        return "\n\n".join(f"{post.title}\n{post_url(post)}" for post in posts) or "Nenhuma matéria publicada."
-    if text == "4":
-        return ("Painel: https://paranaatual.com.br/admin/\n"
-                "Matérias: https://paranaatual.com.br/admin/posts\n"
-                "Radar: https://paranaatual.com.br/admin/radar/\n"
-                "Publicidade: https://paranaatual.com.br/admin/ads\n"
-                "Print automático: https://paranaatual.com.br/admin/prints\n"
-                "Para solicitar relatórios de prints, envie RELATÓRIO no privado do bot.")
-    if text == "5":
-        return COMMANDS
+        posts = Post.query.filter(Post.published_at <= now()).order_by(Post.published_at.desc()).limit(4)
+        latest = "\n\n".join(f"{post.title}\n{post_url(post)}" for post in posts) or "Nenhuma matéria publicada."
+        return latest + f"\n\nCriar matéria: {portal}/admin/posts/new"
+    if text == "9":
+        pending = command("radar pendentes", actor)
+        return f"{pending}\n\n{COMMANDS}\n\nPainel: {portal}/admin/radar/"
+    links = {
+        "3": f"Usuários: {portal}/admin/users",
+        "4": f"Insights: {portal}/admin/insights",
+        "5": f"Configurações e SEO: {portal}/admin/settings",
+        "6": f"Publicidade: {portal}/admin/ads\nPrint automático: {portal}/admin/prints",
+        "7": f"Estúdio de mídia: {portal}/admin/estudio?formato=feed",
+        "8": f"Estúdio de vídeo: {portal}/admin/estudio?formato=video",
+    }
+    if text in links:
+        return links[text]
     return command(text, actor)
 
 
