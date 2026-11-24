@@ -10,6 +10,8 @@ const administrator = '5545990000011';
 test('passes selected group commands through the authenticated webhook and replies to the group', async t => {
   const received = [];
   const replies = [];
+  const replyIds = [];
+  const cardId = '3EB0012345678901234567';
   const routes = { get() {}, post() {} };
   installRadarRoutes(routes, { store: { handles: id => id === selectedGroup } });
 
@@ -19,7 +21,10 @@ test('passes selected group commands through the authenticated webhook and repli
     const data = JSON.parse(Buffer.concat(chunks));
     received.push({ auth: request.headers.authorization, ...data });
     response.writeHead(data.phone === '+' + administrator ? 200 : 403, { 'Content-Type': 'application/json' });
-    response.end(JSON.stringify({ reply: 'Menu da redação' }));
+    const result = data.text === 'RADAR LISTAR 1'
+      ? { reply: 'Pauta recente', messages: [{ id: cardId, text: 'Pauta #42' }] }
+      : { reply: 'Menu da redação' };
+    response.end(JSON.stringify(result));
   }).listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => {
@@ -36,11 +41,9 @@ test('passes selected group commands through the authenticated webhook and repli
 
   const key = { remoteJid: selectedGroup, participant: '987654321@lid',
     participantAlt: administrator + ':2@s.whatsapp.net', fromMe: false, id: 'MENU_TEST_01' };
-  const reply = text => { replies.push(text); };
+  const reply = (text, id) => { replies.push(text); replyIds.push(id); };
   assert.equal(await handleRadarMessage({ key: { ...key, remoteJid: '87654321@g.us' } }, 'menu', reply), false);
   assert.equal(await handleRadarMessage({ key: { ...key, fromMe: true } }, 'menu', reply), false);
-  assert.equal(await handleRadarMessage({ key }, '9', reply), true);
-  assert.equal(received.length, 0);
   assert.equal(await handleRadarMessage({ key }, 'menu', reply), true);
   assert.deepEqual(received, [{ auth: 'Bearer qa-adapter-token', phone: '+' + administrator,
     id: 'MENU_TEST_01', text: 'menu', group_id: selectedGroup }]);
@@ -83,5 +86,14 @@ test('passes selected group commands through the authenticated webhook and repli
   });
   assert.deepEqual(received.slice(6).map(item => item.phone), ['+554590000011', '+' + administrator]);
   assert.equal(replies.length, 6);
+
+  await handleRadarMessage({ key: { ...legacy, id: 'LIST_TEST_001' } }, 'RADAR LISTAR 1', reply);
+  assert.equal(replyIds.at(-1), cardId);
+  assert.equal(replies.at(-1), 'Pauta #42');
+  const quote = { key: { ...legacy, id: 'QUOTE_TEST_001' },
+    message: { extendedTextMessage: { contextInfo: { stanzaId: cardId } } } };
+  await handleRadarMessage(quote, 'POSTAR', reply);
+  assert.equal(received.at(-1).quote_id, cardId);
+  assert.equal(received.at(-1).text, 'POSTAR');
 });
 

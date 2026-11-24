@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ..models import Post, db
 from .editorial import EditorialError
-from .models import GroupDelivery, Story, now
+from .models import ChatCard, GroupDelivery, Story, now
 from .whatsapp import enabled, gateway
 
 
@@ -61,7 +61,7 @@ def message_for(subject, kind):
         return (f"🚨 *Radar Paraná Atual · #{subject.id}*\n{subject.title}\n"
                 f"{subject.location} · Relevância {subject.score}/100\n"
                 f"{first.summary[:350]}\n{first.url}\n"
-                f"Para consultar as fontes: RADAR FONTES {subject.id}")
+                f"Responda POSTAR nesta mensagem ou digite RADAR FONTES {subject.id}.")
     summary = BeautifulSoup(subject.excerpt or subject.content_html or "", "html.parser").get_text(" ", strip=True)
     return (f"📰 *Nova matéria no Paraná Atual*\n\n{subject.title}\n\n"
             f"{summary[:400]}\n{post_url(subject)}")
@@ -98,6 +98,8 @@ def dispatch(subject, config, kind):
         body["cover"] = portal_cover(subject)
     delivery = GroupDelivery(group_id=gid, kind=kind, subject_id=subject.id, state="sending")
     db.session.add(delivery)
+    if kind == "alert" and not db.session.get(ChatCard, body["id"]):
+        db.session.add(ChatCard(message_id=body["id"], story_id=subject.id, scope=gid))
     try:
         db.session.commit()
     except IntegrityError:

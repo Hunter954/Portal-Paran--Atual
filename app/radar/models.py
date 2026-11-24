@@ -171,6 +171,43 @@ class InboundMessage(db.Model):
     created = db.Column(db.DateTime, nullable=False, default=now)
 
 
+class ChatSession(db.Model):
+    __tablename__ = "radar_chat_sessions"
+
+    actor_id = db.Column(db.ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
+    scope = db.Column(db.String(40), primary_key=True)
+    mode = db.Column(db.String(12), nullable=False, default="idle")
+    page_limit = db.Column(db.Integer, nullable=False, default=10)
+    remaining = db.Column(db.Integer, nullable=False, default=0)
+    before_id = db.Column(db.Integer)
+    urgent = db.Column(db.Boolean, nullable=False, default=False)
+    updated = db.Column(db.DateTime, nullable=False, default=now)
+
+
+class ChatCard(db.Model):
+    __tablename__ = "radar_chat_cards"
+
+    message_id = db.Column(db.String(40), primary_key=True)
+    story_id = db.Column(db.ForeignKey("radar_stories.id", ondelete="CASCADE"), nullable=False)
+    actor_id = db.Column(db.ForeignKey("user.id", ondelete="SET NULL"))
+    scope = db.Column(db.String(40), nullable=False)
+    version = db.Column(db.Integer)
+    created = db.Column(db.DateTime, nullable=False, default=now, index=True)
+
+
+class ChatDraftReply(db.Model):
+    __tablename__ = "radar_chat_draft_replies"
+    __table_args__ = (db.UniqueConstraint("job_id", "actor_id", "scope"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.ForeignKey("radar_jobs.id", ondelete="CASCADE"), nullable=False)
+    actor_id = db.Column(db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    scope = db.Column(db.String(40), nullable=False)
+    state = db.Column(db.String(12), nullable=False, default="pending", index=True)
+    created = db.Column(db.DateTime, nullable=False, default=now)
+
+
+
 def audit(action, *, actor=None, story=None, source=None, details=None):
     db.session.add(Audit(action=action, actor_id=actor, story_id=story, source_id=source, details=details))
 

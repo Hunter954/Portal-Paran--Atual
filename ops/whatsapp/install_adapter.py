@@ -19,8 +19,12 @@ SWEEP_V2 = (
     "        if (await handleRadarMessage(message, text, value => replyMessage(remoteJid, value),"
     " lid => socket.signalRepository?.lidMapping?.getPNForLID(lid))) continue;"
 )
-CLIENT_SWEEP = """        const radarText = text || textFromMessage({ message: normalizeMessageContent(message?.message) });
+SWEEP_V3 = """        const radarText = text || textFromMessage({ message: normalizeMessageContent(message?.message) });
         if (await handleRadarMessage(message, radarText, value => replyMessage(remoteJid, value), resolveRadarSender)) continue;"""
+CLIENT_SWEEP = """        const radarMessage = { ...message, message: normalizeMessageContent(message?.message) };
+        const radarText = text || textFromMessage(radarMessage);
+        const radarReply = (value, id) => socket.sendMessage(remoteJid, { text: value }, id ? { messageId: id } : undefined);
+        if (await handleRadarMessage(radarMessage, radarText, radarReply, resolveRadarSender)) continue;"""
 RESOLVE_SENDER = """const resolveRegisteredRadarAliases = createPortalAliasResolver({
   loadAdminJids: getRadarAdminJids,
   lookup: jid => sock ? sock.onWhatsApp(jid.split('@')[0]) : [],
@@ -82,16 +86,17 @@ def main():
             client_text = replace_once(client_text, CLIENT_OLD_IMPORT, CLIENT_IMPORT)
         elif CLIENT_IMPORT not in client_text:
             client_text = CLIENT_IMPORT + "\n" + client_text
-        for legacy in (SWEEP_V2, SWEEP_V1):
+        for legacy in (SWEEP_V3, SWEEP_V2, SWEEP_V1):
             if legacy in client_text:
                 client_text = replace_once(client_text, legacy, CLIENT_SWEEP)
                 break
         else:
             receive = "        const text = textFromMessage(message);"
             client_text = replace_once(client_text, receive, receive + "\n" + CLIENT_SWEEP)
-        client_text = ALIASES_IMPORT + "\n" + client_text
-        client_text = replace_once(client_text, "  fetchLatestBaileysVersion,", "  fetchLatestBaileysVersion,\n  normalizeMessageContent,")
-        client_text = replace_once(client_text, "export async function startWhatsApp()", RESOLVE_SENDER + "export async function startWhatsApp()")
+        if RESOLVE_SENDER not in client_text:
+            client_text = ALIASES_IMPORT + "\n" + client_text
+            client_text = replace_once(client_text, "  fetchLatestBaileysVersion,", "  fetchLatestBaileysVersion,\n  normalizeMessageContent,")
+            client_text = replace_once(client_text, "export async function startWhatsApp()", RESOLVE_SENDER + "export async function startWhatsApp()")
     if "export async function sendRadarGroup(" not in client_text:
         client_text = replace_once(client_text, "export async function sendLivoraPrivate",
                                    SEND_GROUP + "\nexport async function sendLivoraPrivate")

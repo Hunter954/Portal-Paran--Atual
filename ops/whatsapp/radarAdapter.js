@@ -5,7 +5,11 @@ const messageId = /^3EB0[A-F0-9]{18}$/;
 const hash = value => createHash('sha256').update(value).digest();
 const isPhoneJid = value => /^\d+(?::\d+)?@s\.whatsapp\.net$/.test(value || '');
 let groupStore;
-const menuSessions = new Map();
+function validDelivery(messages) {
+  return Array.isArray(messages) && messages.length > 0 && messages.length <= 6 &&
+    messages.every(entry => entry && typeof entry.text === 'string' && entry.text.length > 0 &&
+      entry.text.length <= 3500 && typeof entry.id === 'string' && messageId.test(entry.id));
+}
 
 async function portalCover(value) {
   if (typeof value !== 'string' || value.length > 800) return null;
@@ -68,6 +72,24 @@ export function installRadarRoutes(app, { getStatus, sendPrivate, sendGroup, sto
     const accepted = await sendGroup(data.group_id, data.text, data.id, cover);
     return res.json({ accepted });
   }));
+  app.post('/radar/group/reply', authorize, action(async (req, res) => {
+    const { group_id, revision, messages } = req.body || {};
+    const isCurrent = () => store.handles(group_id) && store.state().revision === revision;
+    if (!isCurrent()) return res.status(409).json({ message: 'O grupo do Radar mudou.' });
+    if (!validDelivery(messages)) return res.sendStatus(400);
+    for (const { text, id } of messages) {
+      if (!isCurrent() || !await sendGroup(group_id, text, id)) return res.json({ accepted: false });
+    }
+    return res.json({ accepted: true });
+  }));
+  app.post('/radar/reply', authorize, action(async (req, res) => {
+    const { phone, messages } = req.body || {};
+    if (!phonePattern.test(phone || '') || !validDelivery(messages)) return res.sendStatus(400);
+    for (const { text, id } of messages) {
+      if (!await sendPrivate(phone, { text }, id)) return res.json({ accepted: false });
+    }
+    return res.json({ accepted: true });
+  }));
   app.post('/radar/send', authorize, async (req, res) => {
     const { phone, text, id } = req.body || {};
     if (typeof phone !== 'string' || !phonePattern.test(phone) ||
@@ -125,30 +147,31 @@ export async function handleRadarMessage(message, text, reply, resolveAliases) {
   const messageKey = message?.key || {};
   const remote = messageKey.remoteJid || '';
   const group = remote.endsWith('@g.us');
+  const root = /^\s*\/?menu\s*$/i.test(text || '');
   const radar = /^\s*RADAR(?:\s|$)/i.test(text || '');
-  const menu = /^\s*\/?menu\s*$/i.test(text || '');
-  const choice = /^\s*[1-9]\s*$/.test(text || '');
+  const consoleCommand = /^\s*(?:CMS|SEO|PUBLICIDADE|USU[ÁA]RIOS|INSIGHTS)(?:\s|$)/i.test(text || '');
+  const directAction = /^\s*(?:POSTAR|CONFIRMAR|VER|FONTES|GERAR|APROVAR|DESCARTAR|RESTAURAR|APURAR|APURADO|T[ÍI]TULO|TEXTO|RESUMO)(?:\s|$)/i.test(text || '');
+  const extra = /^\s*(?:[0-9]{1,4}|MAIS)\s*$/i.test(text || '');
+  const stanza = message?.message?.extendedTextMessage?.contextInfo?.stanzaId;
+  const quote = typeof stanza === 'string' && /^[A-Za-z0-9_-]{8,90}$/.test(stanza) ? stanza : undefined;
   if (group && !text && message?.messageStubType === 2 && groupStore?.handles(remote)) {
     console.info('Radar recebeu mensagem de grupo sem conteúdo descriptografado.');
   }
   if (!url || !token ||
-      (group ? !(radar || menu || choice) || !groupStore?.handles(remote)
-        : !radar || !/@(?:lid|s\.whatsapp\.net)$/.test(remote))) return false;
+      (group ? !(root || radar || consoleCommand || directAction || extra) || !groupStore?.handles(remote)
+        : !(radar || consoleCommand || (directAction && quote)) || !/@(?:lid|s\.whatsapp\.net)$/.test(remote))) return false;
 
   if (messageKey.fromMe) {
-    if (group && menu) console.info('Radar menu recebido da conta vinculada.');
+    if (group && root) console.info('Radar menu recebido da conta vinculada.');
     return false;
   }
   const id = messageKey.id || '';
-  if (!/^[A-Za-z0-9_-]{8,90}$/.test(id) || text.length > 160) {
-    if (group && menu) console.warn('Radar menu descartado por formato inválido.');
+  if (!/^[A-Za-z0-9_-]{8,90}$/.test(id) || text.length > 11500) {
+    if (group && root) console.warn('Radar menu descartado por formato inválido.');
     return true;
   }
 
   const candidates = senderIds(messageKey, group);
-  const sessionKeys = candidates.map(jid => remote + ':' + jid);
-  const current = Date.now();
-  if (group && choice && !sessionKeys.some(key => (menuSessions.get(key) || 0) > current)) return true;
 
   let status;
   const tried = new Set();
@@ -160,7 +183,8 @@ export async function handleRadarMessage(message, text, reply, resolveAliases) {
       tried.add(phone);
       const response = await fetch(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(5000),
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, id, text, ...(group ? { group_id: remote } : {}) }),
+        body: JSON.stringify({ phone, id, text, ...(group ? { group_id: remote } : {}),
+        ...(quote ? { quote_id: quote } : {}) }),
       });
       status = response.status;
       if (status === 403) continue;
@@ -178,24 +202,25 @@ export async function handleRadarMessage(message, text, reply, resolveAliases) {
       data = await forward(aliases);
     }
     if (!data) {
-      if (group && menu) console.info('Radar menu sem resposta.', status ?? 'remetente não identificado');
+      if (group && root) console.info('Radar menu sem resposta.', status ?? 'remetente não identificado');
       else if (status >= 500) console.warn('Webhook do Radar indisponível.', status);
       return true;
     }
-    if (typeof data.reply === 'string' && data.reply.length <= 6000 &&
-        (!group || groupStore.handles(remote))) {
-      if (group && (menu || choice)) {
-        for (const key of sessionKeys) {
-          if (menuSessions.size >= 500) {
-            for (const [entry, expiry] of menuSessions) if (expiry <= current) menuSessions.delete(entry);
-            if (menuSessions.size >= 500) menuSessions.delete(menuSessions.keys().next().value);
-          }
-          menuSessions.set(key, current + 5 * 60 * 1000);
-        }
-      }
-      await reply(data.reply);
-      if (group && menu) console.info('Radar menu respondido.');
+    const outgoing = [];
+    if (typeof data.reply === 'string' && data.reply.length > 0 && data.reply.length <= 6000) {
+      outgoing.push({ text: data.reply });
     }
+    if (Array.isArray(data.messages)) {
+      for (const entry of data.messages.slice(0, 12)) {
+        if (entry && typeof entry.text === 'string' && entry.text.length > 0 &&
+            entry.text.length <= 3500 && (entry.id === undefined || messageId.test(entry.id))) outgoing.push(entry);
+      }
+    }
+    for (const { text: responseText, id: responseId } of outgoing) {
+      if (group && !groupStore.handles(remote)) break;
+      await reply(responseText, responseId);
+    }
+    if (group && root && outgoing.length) console.info('Radar menu respondido.');
   } catch (error) {
     console.warn('Falha ao processar comando do Radar.', error?.name || 'Error');
   }

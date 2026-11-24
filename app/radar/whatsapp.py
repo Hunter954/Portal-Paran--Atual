@@ -8,10 +8,9 @@ import requests
 from flask import Blueprint, abort, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
-from ..models import Post, User, db
-from .editorial import EditorialError, lock_story, queue_draft
-from .geography import normalize
-from .models import Alert, InboundMessage, Story, WhatsAppPreference, audit, now
+from ..models import User, db
+from .editorial import EditorialError
+from .models import Alert, ChatCard, InboundMessage, Story, WhatsAppPreference, audit, now
 
 
 bp = Blueprint("radar_gateway", __name__, url_prefix="/internal/radar/whatsapp")
@@ -28,7 +27,7 @@ def phone_number(value):
     return "+" + digits if re.fullmatch(r"[1-9][0-9]{7,14}", digits) else None
 
 
-def gateway(method, path, **kwargs):
+def gateway(method, path, *, timeout=(3, 7), **kwargs):
     if not enabled():
         raise EditorialError("Gateway do Radar ainda sem configuração.")
     try:
@@ -36,7 +35,7 @@ def gateway(method, path, **kwargs):
             session.trust_env = False
             response = session.request(method, os.environ["RADAR_WHATSAPP_URL"].rstrip("/") + path,
                                        headers={"Authorization": "Bearer " + os.environ["RADAR_WHATSAPP_TOKEN"]},
-                                       timeout=(3, 7), allow_redirects=False, **kwargs)
+                                       timeout=timeout, allow_redirects=False, **kwargs)
             if response.status_code != 200:
                 if response.status_code in {400, 409}:
                     message = response.json().get("message")
@@ -85,10 +84,12 @@ def send_pending_alert():
         text = (f"RADAR PARANÁ ATUAL · #{story.id}\n"
                 f"{story.title}\n{story.location} · Relevância {story.score}/100\n"
                 f"{first.summary[:350]}\n{first.url}\n"
-                f"Responda RADAR FONTES {story.id} ou RADAR AJUDA.")
+                f"Responda POSTAR nesta mensagem ou RADAR FONTES {story.id}.")
         message_key = "3EB0" + hashlib.sha256(f"parana-atual:radar:{story.id}:{user.id}".encode()).hexdigest()[:18].upper()
         alert = Alert(story_id=story.id, user_id=user.id, state="sending")
         db.session.add(alert)
+        if not db.session.get(ChatCard, message_key):
+            db.session.add(ChatCard(message_id=message_key, story_id=story.id, actor_id=user.id, scope=""))
         try:
             db.session.commit()
         except IntegrityError:
@@ -110,17 +111,13 @@ def send_pending_alert():
 
 GROUP_ID = re.compile(r"\d{5,30}@g\.us")
 
-COMMANDS = ("RADAR URGENTES · RADAR PENDENTES · RADAR STATUS · RADAR FONTES ID · "
-            "RADAR RESUMO ID · RADAR APROVAR ID · RADAR GERAR ID · RADAR DESCARTAR ID · RADAR POSTAR ID")
-
-
 @bp.post("")
 def receive():
     secret = os.getenv("RADAR_WHATSAPP_TOKEN")
     received = request.headers.get("Authorization", "")
     if not secret or not hmac.compare_digest(received.encode(), ("Bearer " + secret).encode()):
         abort(401)
-    if request.content_length and request.content_length > 2048:
+    if request.content_length and request.content_length > 50000:
         abort(413)
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
@@ -128,9 +125,12 @@ def receive():
     phone, event_id, message = (data.get(key) for key in ("phone", "id", "text"))
     if (not isinstance(phone, str) or not re.fullmatch(r"\+[1-9][0-9]{7,14}", phone)
             or not isinstance(event_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{8,90}", event_id)
-            or not isinstance(message, str) or len(message) > 160):
+            or not isinstance(message, str) or len(message) > 11500):
         abort(400)
     group_id = data.get("group_id")
+    quote_id = data.get("quote_id")
+    if quote_id is not None and (not isinstance(quote_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{8,90}", quote_id)):
+        abort(400)
     if group_id is not None:
         if not isinstance(group_id, str) or not GROUP_ID.fullmatch(group_id):
             abort(400)
@@ -140,13 +140,8 @@ def receive():
             return jsonify(reply=None), 503
         if not config.get("enabled") or not config.get("available") or config.get("group_id") != group_id:
             return jsonify(reply=None), 403
-        users = [user for user in User.query.filter_by(is_admin=True, is_active=True)
-                 .filter(User.whatsapp.isnot(None)) if phone_number(user.whatsapp) == phone]
-    else:
-        user = db.session.query(User).join(WhatsAppPreference, User.id == WhatsAppPreference.user_id).filter(
-            User.is_admin.is_(True), User.is_active.is_(True), WhatsAppPreference.phone == phone,
-            WhatsAppPreference.enabled.is_(True)).first()
-        users = [user] if user and phone_number(user.whatsapp) == phone else []
+    users = [user for user in User.query.filter_by(is_admin=True, is_active=True)
+             .filter(User.whatsapp.isnot(None)) if phone_number(user.whatsapp) == phone]
     if len(users) != 1:
         return jsonify(reply=None), 403
     user = users[0]
@@ -157,89 +152,9 @@ def receive():
         db.session.rollback()
         return jsonify(reply=None)
     try:
-        text = normalize(message).strip()
-        reply = group_menu(text, user.id) if group_id is not None else command(text, user.id)
+        from .wa_console import group_menu
+        reply = group_menu(message, user.id, group_id, quote_id)
     except EditorialError as exc:
         reply = str(exc)
     db.session.commit()
-    return jsonify(reply=reply)
-
-
-GROUP_MENU = (
-    "*Paraná Atual · Menu da redação*\n\n"
-    "1 — Visão geral\n2 — Matérias\n3 — Usuários\n4 — Insights\n"
-    "5 — Configurações e SEO\n6 — Publicidade e prints\n7 — Arte para redes sociais\n"
-    "8 — Vídeo vertical\n9 — Radar de Notícias\n\n"
-    "Digite uma opção ou RADAR AJUDA."
-)
-
-
-def group_menu(text, actor):
-    portal = "https://paranaatual.com.br"
-    if text in {"menu", "/menu"}:
-        return GROUP_MENU
-    if text == "1":
-        posts = Post.query.filter(Post.published_at <= now()).count()
-        new = Story.query.filter_by(state="new").count()
-        return f"{posts} matérias publicadas · {new} pautas para analisar\nPainel: {portal}/admin/"
-    if text == "2":
-        from .group_delivery import post_url
-
-        posts = Post.query.filter(Post.published_at <= now()).order_by(Post.published_at.desc()).limit(4)
-        latest = "\n\n".join(f"{post.title}\n{post_url(post)}" for post in posts) or "Nenhuma matéria publicada."
-        return latest + f"\n\nCriar matéria: {portal}/admin/posts/new"
-    if text == "9":
-        pending = command("radar pendentes", actor)
-        return f"{pending}\n\n{COMMANDS}\n\nPainel: {portal}/admin/radar/"
-    links = {
-        "3": f"Usuários: {portal}/admin/users",
-        "4": f"Insights: {portal}/admin/insights",
-        "5": f"Configurações e SEO: {portal}/admin/settings",
-        "6": f"Publicidade: {portal}/admin/ads\nPrint automático: {portal}/admin/prints",
-        "7": f"Estúdio de mídia: {portal}/admin/estudio?formato=feed",
-        "8": f"Estúdio de vídeo: {portal}/admin/estudio?formato=video",
-    }
-    if text in links:
-        return links[text]
-    return command(text, actor)
-
-
-def command(text, actor):
-    match = re.fullmatch(r"\s*radar\s+([a-z]+)(?:\s+(?:#?pa-)?([0-9]{1,9}))?\s*", text)
-    if not match:
-        return COMMANDS
-    action, number = match.groups()
-    if action == "ajuda":
-        return COMMANDS
-    if action == "status":
-        return "Radar ativo. " + ("Publicação editorial disponível no painel." if os.getenv(
-            "RADAR_ENABLE_PUBLISHING") == "1" else "Publicação pelo Radar desativada.")
-    if action in {"pendentes", "urgentes"}:
-        entries = Story.query.filter(Story.state.in_(("new", "research", "production", "review")))
-        if action == "urgentes":
-            entries = entries.filter(Story.score >= 75)
-        return "\n".join(f"#{s.id} · {s.title}" for s in entries.order_by(
-            Story.score.desc(), Story.id.desc()).limit(5)) or "Nenhuma pauta nesta fila."
-    if not number or action not in {"resumo", "fontes", "aprovar", "gerar", "descartar", "postar"}:
-        return COMMANDS
-    story = lock_story(int(number))
-    if not story:
-        return "Pauta não encontrada."
-    if action == "fontes":
-        return "\n".join(f"{a.source.name}: {a.url}" for a in story.articles[:5]) or "Sem fontes."
-    if action == "resumo":
-        return f"{story.title}\n{story.location}\n{story.articles[0].summary}"
-    if action == "postar":
-        return ("Abra a pauta no painel para revisar e confirmar a publicação da versão atual.\n"
-                f"https://paranaatual.com.br/admin/radar/pautas/{story.id}")
-    if story.state in {"published", "discarded", "scheduled"}:
-        raise EditorialError("Esta pauta não permite a ação solicitada.")
-    if action == "gerar":
-        queue_draft(story, actor)
-    else:
-        story.previous_state = story.state
-        story.state = "production" if action == "aprovar" else "discarded"
-    story.updated = now()
-    audit("whatsapp_" + action, actor=actor, story=story.id)
-    return f"Ação registrada na pauta #{story.id}."
-
+    return jsonify(reply) if isinstance(reply, dict) else jsonify(reply=reply)

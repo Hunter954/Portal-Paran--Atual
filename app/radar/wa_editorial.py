@@ -1,0 +1,276 @@
+"""Conversas e cartões editoriais respondíveis no WhatsApp."""
+
+from datetime import timedelta
+import re
+from secrets import token_hex
+
+from sqlalchemy import select
+
+from ..models import Post, db
+from .editorial import EditorialError, latest_draft, lock_story, publish, queue_draft, save_draft
+from .geography import normalize
+from .models import ChatCard, ChatDraftReply, ChatSession, Story, audit, now
+
+
+OPEN_STATES = ("new", "research", "production", "review")
+PAGE_SIZE = 10
+HELP = (
+    "*Radar Paraná Atual*\n"
+    "Quantas pautas você quer receber? Digite um número, como *10*, ou *RADAR LISTAR 10*.\n"
+    "Use *MAIS* para continuar, *RADAR REENVIAR* para receber a lista novamente ou "
+    "*RADAR URGENTES 10* para filtrar.\n"
+    "Deslize uma pauta para responder *POSTAR*. Quando receber o rascunho, revise e responda "
+    "*POSTAR* na própria prévia para publicar aquela versão.\n"
+    "Também pode digitar *RADAR VER 92*, *RADAR POSTAR 92* ou *RADAR STATUS*."
+)
+
+
+def chat_session(actor, group):
+    scope = group or ""
+    result = db.session.execute(select(ChatSession).where(
+        ChatSession.actor_id == actor, ChatSession.scope == scope
+    ).with_for_update()).scalar_one_or_none()
+    if result is None:
+        result = ChatSession(actor_id=actor, scope=scope, mode="idle")
+        db.session.add(result)
+    elif result.updated < now() - timedelta(minutes=30):
+        result.mode, result.before_id, result.remaining = "idle", None, 0
+    result.updated = now()
+    return result
+
+
+def reply_card(story, text, actor, group, draft=None):
+    identifier = "3EB0" + token_hex(9).upper()
+    ref = ChatCard(message_id=identifier, story_id=story.id, actor_id=actor, scope=group or "",
+                   version=draft.version if draft else None)
+    db.session.add(ref)
+    return {"id": identifier, "text": text}
+
+
+def story_card(story, actor, group):
+    article = story.articles[0]
+    summary = article.summary[:330].strip()
+    label = {
+        "new": "Nova", "research": "Em apuração", "production": "Preparando rascunho",
+        "review": "Rascunho pronto", "published": "Publicada", "discarded": "Arquivada",
+        "scheduled": "Agendada",
+    }.get(story.state, story.state)
+    text = (f"*Pauta #{story.id} · {label}*\n{story.title}\n"
+            f"{story.location} · {story.score}/100 · {article.source.name}\n"
+            f"{summary}\n\nResponda *POSTAR* ou *VER* nesta mensagem.")
+    return reply_card(story, text, actor, group)
+
+
+def draft_cards(story, draft, actor, group):
+    source_list = "\n".join(f"• {a.source.name}: {a.url}" for a in story.articles[:3])
+    pending = "\n".join(f"• {item}" for item in draft.pending[:4])
+    full = (f"*Prévia da pauta #{story.id} · versão {draft.version}*\n\n*{draft.title}*\n"
+            f"{draft.excerpt}\n\n{draft.body}\n\n*Fontes*\n{source_list}")
+    if pending:
+        full += f"\n\n*Pontos para conferir*\n{pending}"
+    confirmation = (f"*Pauta #{story.id} · versão {draft.version}*\n"
+                    "Responda *POSTAR* nesta prévia para confirmar ou *TÍTULO novo título*, "
+                    "*RESUMO novo resumo* ou *TEXTO novo texto* para editar.\n"
+                    f"Também pode digitar *RADAR CONFIRMAR {story.id} {draft.version}*.")
+    if len(full) + len(confirmation) + 2 <= 3100:
+        return [reply_card(story, full + "\n\n" + confirmation, actor, group, draft)]
+    chunks = []
+    remaining = full
+    while remaining:
+        candidate = remaining[:3000]
+        boundary = candidate.rfind("\n")
+        size = boundary if len(remaining) > 3000 and boundary > 1600 else len(candidate)
+        chunks.append({"text": remaining[:size]})
+        remaining = remaining[size:].lstrip()
+    return [*chunks, reply_card(story, confirmation, actor, group, draft)]
+
+
+def open_radar(actor, group):
+    session = chat_session(actor, group)
+    session.mode = "radar"
+    return HELP
+
+
+def list_stories(actor, group, count=None, *, urgent=False, more=False):
+    session = chat_session(actor, group)
+    session.mode = "radar"
+    if not more:
+        session.page_limit, session.remaining = count or 10, count or 10
+        session.before_id, session.urgent = None, urgent
+    if not session.remaining:
+        return "A lista terminou. Digite *RADAR LISTAR 10* ou escolha outra quantidade."
+    query = Story.query.filter(Story.state.in_(OPEN_STATES), Story.articles.any())
+    if session.urgent:
+        query = query.filter(Story.score >= 75)
+    if session.before_id:
+        query = query.filter(Story.id < session.before_id)
+    size = min(PAGE_SIZE, session.remaining)
+    rows = query.order_by(Story.id.desc()).limit(size + 1).all()
+    stories = rows[:size]
+    if not stories:
+        session.remaining = 0
+        return "Nenhuma pauta nessa fila agora."
+    session.before_id = stories[-1].id
+    session.remaining = session.remaining - len(stories) if len(rows) > size else 0
+    title = f"*{len(stories)} pautas {'urgentes' if session.urgent else 'mais recentes'} do Radar*"
+    if session.remaining:
+        title += f"\nDigite *MAIS* para continuar. Restam até {session.remaining} nesta solicitação."
+    return {"reply": title, "messages": [story_card(story, actor, group) for story in stories]}
+
+
+def quoted_card(quote_id, actor, group):
+    if not quote_id:
+        return None
+    card = db.session.get(ChatCard, quote_id)
+    if (not card or card.scope != (group or "") or (not group and card.actor_id != actor)
+            or card.created < now() - timedelta(days=30)):
+        return None
+    return card
+
+
+def request_draft(story, actor, group, *, fresh=False):
+    latest = latest_draft(story.id)
+    if latest and story.state == "review" and not fresh:
+        return {"messages": draft_cards(story, latest, actor, group)}
+    job = queue_draft(story, actor)
+    db.session.flush()
+    previous = ChatDraftReply.query.filter_by(job_id=job.id, actor_id=actor, scope=group or "").first()
+    if not previous:
+        db.session.add(ChatDraftReply(job_id=job.id, actor_id=actor, scope=group or ""))
+    return f"Vou preparar a pauta *#{story.id}*. A prévia chega nesta conversa para você revisar e publicar."
+
+
+def confirm_story(story, version, actor):
+    existing = db.session.get(Post, story.post_id) if story.post_id else None
+    if existing:
+        from .group_delivery import post_url
+        return f"A pauta *#{story.id}* já está publicada.\n{post_url(existing)}"
+    latest = latest_draft(story.id)
+    if not latest or latest.version != version or story.state != "review":
+        raise EditorialError("Essa prévia mudou ou saiu da fila de revisão. Responda *VER* para receber a versão atual.")
+    if not any(article.evidence for article in story.articles):
+        raise EditorialError("A pauta precisa de uma fonte com o vínculo documentado com o Paraná.")
+    if latest.pending:
+        raise EditorialError("A prévia tem pontos de apuração pendentes. Depois de conferir as fontes, responda *APURADO* na prévia.")
+    with db.session.begin_nested():
+        story.approved_draft_id = latest.id
+        post = publish(story, version, actor)
+        audit("whatsapp_publicada", actor=actor, story=story.id, details=f"Versão {version}")
+    from .group_delivery import post_url
+    return f"✅ *Pauta #{story.id} publicada*\n{post.title}\n{post_url(post)}"
+
+
+def edit_draft(story, version, action, value, actor, group):
+    latest = latest_draft(story.id)
+    if not latest or latest.version != version or story.state != "review":
+        raise EditorialError("Responda na prévia da versão atual para editar.")
+    fields = {"titulo": ("titulo", 500), "resumo": ("resumo", 2000), "texto": ("corpo", 10000)}
+    field, limit = fields[action]
+    if not value or len(value) > limit:
+        raise EditorialError(f"Envie de 1 a {limit} caracteres para este campo.")
+    values = {"titulo": latest.title, "resumo": latest.excerpt, "corpo": latest.body}
+    values[field] = value
+    result = save_draft(story, values, actor)
+    return {"messages": draft_cards(story, result, actor, group)}
+
+
+def radar_status():
+    total = Story.query.filter(Story.state.in_(OPEN_STATES)).count()
+    urgent = Story.query.filter(Story.state.in_(OPEN_STATES), Story.score >= 75).count()
+    from .group_delivery import group_settings
+    try:
+        settings = group_settings()
+    except EditorialError:
+        settings = {}
+    label = (f"Alertas automáticos a partir de {settings.get('minimum', 75)}/100, "
+             "para pautas novas após a ativação.") if settings.get("alerts") else "Alertas automáticos desligados."
+    return f"{total} pautas abertas · {urgent} urgentes.\n{label}\nUse *RADAR LISTAR 10* para buscar o histórico recente."
+
+
+def radar_command(text, actor, group, quote_id=None):
+    raw = text.strip()
+    plain = normalize(raw)
+    words = plain.split()
+    if not words:
+        return HELP
+    explicit = words[0] == "radar"
+    if explicit:
+        prefix = re.match(r"\S+\s*", raw)
+        raw = raw[prefix.end():]
+        plain = normalize(raw)
+        words = plain.split()
+    if not words or plain in {"ajuda", "menu"}:
+        return open_radar(actor, group)
+    action = words[0]
+    session = chat_session(actor, group)
+    if plain.isdecimal():
+        if not explicit and session.mode != "radar":
+            return None
+        return list_stories(actor, group, min(9999, int(plain))) if int(plain) > 0 else HELP
+    if action in {"listar", "ultimas", "pendentes", "urgentes", "reenviar"}:
+        number = words[1] if len(words) == 2 else ""
+        if len(words) > 2 or number and (not number.isdecimal() or len(number) > 4 or int(number) == 0):
+            return "Informe a quantidade. Exemplo: *RADAR LISTAR 10*."
+        return list_stories(actor, group, int(number) if number else (session.page_limit if action == "reenviar" else 10),
+                            urgent=action == "urgentes")
+    if plain == "mais":
+        return list_stories(actor, group, more=True)
+    if plain == "status":
+        return radar_status()
+    if action not in {"ver", "fontes", "titulo", "resumo", "texto", "postar", "confirmar", "aprovar", "gerar",
+                      "descartar", "restaurar", "apurar", "apurado"}:
+        return HELP
+
+    card = quoted_card(quote_id, actor, group)
+    target = re.fullmatch(r"(?:#?(?:pa-)?)?([0-9]{1,9})", words[1]) if len(words) > 1 else None
+    editing = card and card.version is not None and action in {"titulo", "resumo", "texto"} and len(words) > 1
+    if card and len(words) > 1 and action in {"postar", "confirmar"}:
+        return "Responda apenas *POSTAR* na prévia que você quer publicar."
+    story_id = card.story_id if card else (int(target[1]) if target else None)
+    if not story_id:
+        return "Responda em uma pauta recebida ou informe o ID. Exemplo: *RADAR POSTAR 92*."
+    story = lock_story(story_id)
+    if not story or not story.articles:
+        return "Pauta não encontrada."
+    if editing:
+        value = raw.split(maxsplit=1)[1]
+        return edit_draft(story, card.version, action, value.strip(), actor, group)
+    if action == "apurado":
+        latest = latest_draft(story.id)
+        if not card or not latest or card.version != latest.version or story.state != "review":
+            raise EditorialError("Responda *APURADO* na prévia da versão atual depois de conferir as fontes.")
+        result = save_draft(story, {"titulo": latest.title, "resumo": latest.excerpt, "corpo": latest.body,
+                                    "pendencias": []}, actor)
+        audit("whatsapp_apuracao_concluida", actor=actor, story=story.id)
+        return {"messages": draft_cards(story, result, actor, group)}
+    if action == "fontes":
+        return "\n".join(f"{a.source.name}\n{a.url}" for a in story.articles[:5])
+    if action in {"ver", "resumo"}:
+        latest = latest_draft(story.id)
+        if latest and story.state == "review":
+            return {"messages": draft_cards(story, latest, actor, group)}
+        return {"messages": [story_card(story, actor, group)]}
+    if action in {"postar", "confirmar"}:
+        if card and card.version is not None:
+            return confirm_story(story, card.version, actor)
+        if action == "confirmar":
+            if target and len(words) == 3 and re.fullmatch(r"[0-9]{1,6}", words[2]):
+                return confirm_story(story, int(words[2]), actor)
+            return "Confirme respondendo *POSTAR* na prévia da versão que você revisou."
+        if story.post_id:
+            return confirm_story(story, 0, actor)
+        return request_draft(story, actor, group)
+    if action == "gerar":
+        return request_draft(story, actor, group, fresh=True)
+    if action == "restaurar" and story.state == "discarded":
+        story.state = story.previous_state or "new"
+        story.previous_state = None
+    elif story.state in OPEN_STATES and action in {"aprovar", "descartar", "apurar"}:
+        story.previous_state = story.state
+        story.state = {"aprovar": "production", "descartar": "discarded", "apurar": "research"}[action]
+    else:
+        raise EditorialError("A pauta não permite esta ação no estado atual.")
+    story.updated = now()
+    audit("whatsapp_" + action, actor=actor, story=story.id)
+    return f"Ação registrada na pauta *#{story.id}*."
+

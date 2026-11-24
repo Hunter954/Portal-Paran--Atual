@@ -21,7 +21,7 @@ Encerre o worker, restaure a imagem anterior do portal e preserve o backup. Mant
 
 O portal e o gateway foram atualizados como serviços Docker Swarm do Dokploy. As imagens de referência para rollback são `parana-atual-radar-base:6ea2ed4` para o portal e `127.0.0.1:5000/paranapop-trivox-whatsapp:foztotal-prints-20261123` para o gateway. O backup PostgreSQL validado está no host em `/root/parana-atual-radar-20261124/before-radar.pg.dump`.
 
-O worker `radar-parana-worker` e o Ollama `radar-parana-ollama` têm reinício automático e limites de CPU e memória. O Ollama usa `qwen3:1.7b` nesta VPS após o teste do modelo de 4B ultrapassar o tempo limite. O serviço usa rede interna para inferência. O Dokploy está configurado para a branch `radar-parana-atual` no portal e para a imagem `127.0.0.1:5000/paranapop-trivox-whatsapp:parana-atual-menu-jid-20261124` no gateway, com as variáveis de integração registradas nos dois serviços.
+O worker `radar-parana-worker` e o Ollama `radar-parana-ollama` têm reinício automático e limites de CPU e memória. O Ollama usa `qwen3:1.7b` nesta VPS após o teste do modelo de 4B ultrapassar o tempo limite. O serviço usa rede interna para inferência. O Dokploy está configurado para a branch `radar-parana-atual` no portal e para a imagem `127.0.0.1:5000/paranapop-trivox-whatsapp:parana-atual-radar-chat-20261124` no gateway, com as variáveis de integração registradas nos dois serviços.
 
 Para retirar o Radar, pare `radar-parana-worker` e restaure as imagens anteriores dos serviços. Remova as configurações `RADAR_*` dos serviços ao restaurar o estado anterior. Use o backup apenas se houver necessidade de restaurar dados. O portal anterior funciona com as tabelas do Radar preservadas.
 
@@ -34,3 +34,12 @@ No grupo selecionado, um administrador ativo com WhatsApp cadastrado pode usar `
 
 A captura usa `PARANAATUAL_AD_REPORTS_URL` e `PARANAATUAL_AD_REPORTS_TOKEN`. Execute a migração do Radar antes de ligar o worker atualizado. A nova tabela `radar_group_deliveries` registra partilhas de matérias e alertas, com controle de duplicatas. Envios começam a partir da ativação do grupo ou da automação. A revisão e a confirmação da versão são obrigatórias para publicar uma pauta do Radar pelo painel.
 
+
+
+## Radar na conversa do WhatsApp
+
+Digite MENU e escolha 9, ou use RADAR LISTAR 10. Cada pauta chega em uma mensagem pr?pria. Informe outra quantidade, use MAIS para continuar ou RADAR REENVIAR para repetir a consulta. RADAR URGENTES 10 filtra as pautas com pontua??o a partir de 75. Os alertas autom?ticos seguem o limite escolhido e a data de ativa??o, enquanto a listagem manual inclui o hist?rico aberto.
+
+Responda POSTAR na mensagem da pauta para preparar ou obter a pr?via. Confira o texto e as fontes recebidas. Responder POSTAR na pr?via ? a confirma??o da vers?o exata. Tamb?m ? poss?vel usar RADAR POSTAR ID e RADAR CONFIRMAR ID VERS?O. Responda T?TULO, RESUMO ou TEXTO seguido do conte?do na pr?via para editar. Use APURADO na pr?via quando tiver conferido e resolvido os pontos pendentes.
+
+A migra??o cria radar_chat_sessions, radar_chat_cards e radar_chat_draft_replies. A configura??o do grupo e os alertas permanecem no gateway existente. A publica??o conserva as permiss?es definidas em RADAR_PUBLISHER_IDS e as verifica??es de duplicidade do Radar.

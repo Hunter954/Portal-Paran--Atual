@@ -5,12 +5,13 @@ from html import escape
 
 import click
 import requests
-from flask import url_for
+from bs4 import BeautifulSoup
 from sqlalchemy import select
 
 from ..admin import _ensure_unique_slug
 from ..models import Category, Post, User, db
 from .collector import similar
+from .fetch import FetchError, PublicFetcher
 from .models import Draft, Job, Story, audit, now
 
 
@@ -80,9 +81,11 @@ def queue_draft(story, actor_id):
         raise EditorialError("Configure o endereço interno do Ollama na implantação do worker.")
     prior = Job.query.filter(Job.story_id == story.id, Job.state.in_(("pending", "running"))).first()
     if not prior:
-        db.session.add(Job(story_id=story.id, actor_id=actor_id))
+        prior = Job(story_id=story.id, actor_id=actor_id)
+        db.session.add(prior)
         audit("geracao_solicitada", story=story.id, actor=actor_id)
     story.state = "production"
+    return prior
 
 
 def generate(sources):
@@ -141,17 +144,41 @@ def validate_draft(output, source_ids):
     return output
 
 
+def supplement_excerpt(sources):
+    if any(len(source["resumo"]) >= 45 for source in sources):
+        return sources
+    fetcher = PublicFetcher()
+    for source in sources:
+        try:
+            response = fetcher.get(source["url"])
+        except FetchError:
+            continue
+        if response.status != 200 or "html" not in response.headers.get("content-type", ""):
+            continue
+        page = BeautifulSoup(response.body, "html.parser")
+        article = page.find("article")
+        if article:
+            plain = " ".join(p.get_text(" ", strip=True) for p in article.find_all("p", limit=8))
+        else:
+            meta = page.find("meta", attrs={"property": "og:description"})
+            plain = meta.get("content", "") if meta else ""
+        if len(plain.strip()) >= 45:
+            source["resumo"] = plain.strip()[:650]
+            break
+    return sources
+
+
 def run_job(job):
     job_id, story_id, actor_id = job.id, job.story_id, job.actor_id
     story = db.session.get(Story, story_id)
     sources = [{"id": item.id, "titulo": item.title, "resumo": item.summary,
-                "fonte": item.source.name, "local": story.location} for item in story.articles[:3]]
+                "fonte": item.source.name, "local": story.location, "url": item.url} for item in story.articles[:3]]
     previous = latest_draft(story_id)
     previous_id = previous.id if previous else None
     job.state, job.started = "running", now()
     db.session.commit()
     try:
-        output = generate(sources)
+        output = generate(supplement_excerpt(sources))
         error = None
     except EditorialError as exc:
         error = str(exc)
@@ -204,7 +231,7 @@ def publish(story, version, actor_id):
             Post.published_at.desc()).limit(200)
         matches = next((p for p in recent if similar(p.title, draft.title) or similar(p.title, story.title)), None)
     if matches:
-        raise EditorialError(f"Possível duplicidade com a matéria #{matches.id}. Confira o CMS.")
+        raise EditorialError(f"Possível duplicidade com a matéria #{matches.id}. Consulte a matéria existente antes de publicar.")
     paragraphs = "".join(f"<p>{escape(p.strip())}</p>" for p in draft.body.splitlines() if p.strip())
     sources = "".join(f'<li><a href="{escape(a.url, quote=True)}">{escape(a.source.name)}</a></li>'
                       for a in story.articles)
