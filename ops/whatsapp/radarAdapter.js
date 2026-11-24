@@ -86,20 +86,20 @@ export function installRadarRoutes(app, { getStatus, sendPrivate, sendGroup, sto
 export async function handleRadarMessage(message, text, reply, resolvePhone) {
   const url = process.env.RADAR_WHATSAPP_WEBHOOK;
   const token = process.env.RADAR_WHATSAPP_TOKEN;
-  const key = message?.key || {};
-  const remote = key.remoteJid || '';
+  const messageKey = message?.key || {};
+  const remote = messageKey.remoteJid || '';
   const group = remote.endsWith('@g.us');
   const radar = /^\s*RADAR(?:\s|$)/i.test(text || '');
   const menu = /^\s*\/?menu\s*$/i.test(text || '');
   const choice = /^\s*[1-9]\s*$/.test(text || '');
   const groupCommand = menu || choice;
-  if (!url || !token || key.fromMe ||
+  if (!url || !token || messageKey.fromMe ||
       (group ? !(radar || groupCommand) || !groupStore?.handles(remote)
         : !radar || !/@(?:lid|s\.whatsapp\.net)$/.test(remote))) return false;
-  const id = key.id || '';
+  const id = messageKey.id || '';
   if (!/^[A-Za-z0-9_-]{8,90}$/.test(id) || text.length > 160) return true;
   try {
-    const candidates = group ? [key.participant, key.participantAlt] : [remote, key.remoteJidAlt];
+    const candidates = group ? [messageKey.participant, messageKey.participantAlt] : [remote, messageKey.remoteJidAlt];
     let jid = candidates.find(isPhoneJid);
     if (!jid && typeof resolvePhone === 'function') {
       const lid = candidates.find(value => /^\d+(?::\d+)?@lid$/.test(value || ''));
@@ -107,14 +107,17 @@ export async function handleRadarMessage(message, text, reply, resolvePhone) {
     }
     if (!isPhoneJid(jid)) return true;
     const phone = '+' + jid.split(/[:@]/)[0];
-    const key = remote + ':' + phone;
+    const sessionKey = remote + ':' + phone;
     const current = Date.now();
-    if (group && choice && (menuSessions.get(key) || 0) <= current) return true;
+    if (group && choice && (menuSessions.get(sessionKey) || 0) <= current) return true;
     const response = await fetch(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(5000),
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone, id, text, ...(group ? { group_id: remote } : {}) }),
     });
-    if (!response.ok) return true;
+    if (!response.ok) {
+      if (response.status >= 500) console.warn('Webhook do Radar indisponível.', response.status);
+      return true;
+    }
     const data = await response.json();
     if (typeof data.reply === 'string' && data.reply.length <= 6000 &&
         (!group || groupStore.handles(remote))) {
@@ -123,12 +126,12 @@ export async function handleRadarMessage(message, text, reply, resolvePhone) {
           for (const [entry, expiry] of menuSessions) if (expiry <= current) menuSessions.delete(entry);
           if (menuSessions.size >= 500) menuSessions.delete(menuSessions.keys().next().value);
         }
-        menuSessions.set(key, current + 5 * 60 * 1000);
+        menuSessions.set(sessionKey, current + 5 * 60 * 1000);
       }
       await reply(data.reply);
     }
-  } catch {
-    // O gateway compartilhado continua disponível durante falhas do portal.
+  } catch (error) {
+    console.warn('Falha ao processar comando do Radar.', error?.name || 'Error');
   }
   return true;
 }
