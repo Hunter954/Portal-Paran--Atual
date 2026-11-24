@@ -131,3 +131,34 @@ def test_private_quotes_are_scoped_and_pending_facts_require_apuracao(portal, mo
     reviewed = send("APURADO", preview["id"]).json["messages"][-1]
     assert "publicada" in send("POSTAR", reviewed["id"]).json["reply"]
 
+
+
+def test_sources_and_scheduling_can_be_managed_in_chat(portal, monkeypatch):
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    from app.radar.models import Run
+    send, _ = provision(portal, monkeypatch)
+    seed(1)
+    result = send("RADAR FONTE ADICIONAR Prefeitura | https://prefeitura.example.org/noticias.xml | rss").json["reply"]
+    assert "cadastrada" in result
+    source = Source.query.filter_by(name="Prefeitura").one()
+    assert "Prefeitura" in send("RADAR FONTES").json["reply"]
+    assert "na fila" in send(f"RADAR COLETAR {source.id}").json["reply"]
+    assert Run.query.filter_by(source_id=source.id).count() == 1
+    assert "pausada" in send(f"RADAR FONTE PAUSAR {source.id}").json["reply"]
+    assert "Ative a fonte" in send(f"RADAR COLETAR {source.id}").json["reply"]
+    assert "ativada" in send(f"RADAR FONTE ATIVAR {source.id}").json["reply"]
+    card = send("RADAR LISTAR 1").json["messages"][0]
+    send("POSTAR", card["id"])
+    monkeypatch.setattr("app.radar.editorial.generate", lambda sources: {
+        "titulo": "Aulas em Curitiba", "resumo": "Curso", "corpo": "Inscrições gratuitas.",
+        "fatos": [], "pendencias": []})
+    run_job(Job.query.one())
+    story = Story.query.one()
+    preview = send(f"RADAR VER {story.id}").json["messages"][0]
+    when = datetime.now(ZoneInfo("America/Sao_Paulo")) + timedelta(days=1)
+    assert "agendada" in send(f"RADAR AGENDAR {when:%d/%m/%Y %H:%M}", preview["id"]).json["reply"]
+    assert story.state == "scheduled" and Post.query.count() == 0
+    assert "cancelado" in send(f"RADAR CANCELAR {story.id}").json["reply"]
+    assert story.state == "review" and story.scheduled is None
+

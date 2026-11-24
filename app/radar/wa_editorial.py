@@ -7,7 +7,7 @@ from secrets import token_hex
 from sqlalchemy import select
 
 from ..models import Post, db
-from .editorial import EditorialError, latest_draft, lock_story, publish, queue_draft, save_draft
+from .editorial import EditorialError, can_publish, latest_draft, lock_story, publish, queue_draft, save_draft
 from .geography import normalize
 from .models import ChatCard, ChatDraftReply, ChatSession, Story, audit, now
 
@@ -217,8 +217,11 @@ def radar_command(text, actor, group, quote_id=None):
         return list_stories(actor, group, more=True)
     if plain == "status":
         return radar_status()
+    if action in {"fonte", "coletar"} or (plain == "fontes" and not quote_id):
+        from .wa_actions import source_command
+        return source_command(raw, actor)
     if action not in {"ver", "fontes", "titulo", "resumo", "texto", "postar", "confirmar", "aprovar", "gerar",
-                      "descartar", "restaurar", "apurar", "apurado"}:
+                      "descartar", "restaurar", "apurar", "apurado", "agendar", "cancelar"}:
         return HELP
 
     card = quoted_card(quote_id, actor, group)
@@ -232,6 +235,16 @@ def radar_command(text, actor, group, quote_id=None):
     story = lock_story(story_id)
     if not story or not story.articles:
         return "Pauta não encontrada."
+    if action == "agendar":
+        from .wa_actions import schedule_from_preview
+        return schedule_from_preview(story, card, raw, actor)
+    if action == "cancelar":
+        if story.state != "scheduled" or not can_publish(actor):
+            raise EditorialError("Esta pauta não pode ter o agendamento cancelado por este administrador.")
+        story.state, story.scheduled, story.approved_draft_id = "review", None, None
+        story.updated = now()
+        audit("whatsapp_cancelou_agendamento", actor=actor, story=story.id)
+        return f"Agendamento da pauta *#{story.id}* cancelado. Ela voltou para revisão."
     if editing:
         value = raw.split(maxsplit=1)[1]
         return edit_draft(story, card.version, action, value.strip(), actor, group)

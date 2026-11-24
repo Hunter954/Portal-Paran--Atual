@@ -43,3 +43,5 @@ Digite MENU e escolha 9, ou use RADAR LISTAR 10. Cada pauta chega em uma mensage
 Responda POSTAR na mensagem da pauta para preparar ou obter a pr?via. Confira o texto e as fontes recebidas. Responder POSTAR na pr?via ? a confirma??o da vers?o exata. Tamb?m ? poss?vel usar RADAR POSTAR ID e RADAR CONFIRMAR ID VERS?O. Responda T?TULO, RESUMO ou TEXTO seguido do conte?do na pr?via para editar. Use APURADO na pr?via quando tiver conferido e resolvido os pontos pendentes.
 
 A migra??o cria radar_chat_sessions, radar_chat_cards e radar_chat_draft_replies. A configura??o do grupo e os alertas permanecem no gateway existente. A publica??o conserva as permiss?es definidas em RADAR_PUBLISHER_IDS e as verifica??es de duplicidade do Radar.
+
+Use RADAR FONTES para listar o cat?logo, RADAR FONTE ADICIONAR nome | URL | tipo para cadastrar e RADAR COLETAR ID para solicitar uma coleta. Para agendar, responda RADAR AGENDAR DD/MM/AAAA HH:MM na pr?via revisada, no hor?rio de Bras?lia. RADAR CANCELAR ID devolve uma pauta agendada ? revis?o.
