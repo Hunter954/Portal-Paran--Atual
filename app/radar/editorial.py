@@ -305,6 +305,10 @@ def publish(story, version, actor_id):
     if matches:
         raise EditorialError(f"Possível duplicidade com a matéria #{matches.id}. Consulte a matéria existente antes de publicar.")
     photo = db.session.get(DraftMedia, draft.id)
+    if photo:
+        from .wa_cover import generic_photo
+        if generic_photo(photo):
+            raise EditorialError("A foto antiga não pertence à reportagem original. Busque a foto na prévia atual antes de publicar.")
     if photo and not photo.license:
         photo = None
     category = Category.query.filter_by(name=story.category).first() if story.category else None

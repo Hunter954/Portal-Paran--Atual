@@ -226,21 +226,25 @@ def test_standard_post_adds_photo_and_publishes_from_quoted_preview(portal, monk
     assert app.test_client().get(Post.query.one().featured_image).status_code == 200
 
 
-def test_topic_image_search_stays_in_chat_and_updates_selected_post(portal, monkeypatch):
+def test_original_source_photo_stays_in_chat_and_updates_selected_post(portal, monkeypatch):
     from app.radar.models import CoverSearch
     from app.radar.wa_cover import run_cover_search
 
     send, group = provision(portal, monkeypatch)
     card = send("CMS NOVA Mostra em Curitiba | Haverá oficinas abertas.").json["messages"][-1]
-    assert "Buscando fotos" in send("BUSCAR FOTO Parque Barigui", card["id"]).json["reply"]
+    Post.query.one().source_url = "https://example.org/reportagem"
+    db.session.commit()
+    # Refresh the version-bound card after the source is registered.
+    from app.radar.wa_cms import preview
+    card = preview(Post.query.one(), portal[1], GROUP)["messages"][-1]
+    assert "reportagem original" in send("BUSCAR FOTO Parque Barigui", card["id"]).json["reply"]
     assert CoverSearch.query.one().term == "Parque Barigui"
     photo = {"path": "/media/radar/photo.jpg", "credit": "Autora", "description": "Parque Barigui",
              "url": "https://example.org/photo.jpg", "license": "CC BY 4.0"}
     monkeypatch.setattr("app.radar.wa_cover.enabled", lambda: True)
     monkeypatch.setattr("app.radar.wa_cover.group_settings", lambda: group)
-    monkeypatch.setattr("app.radar.wa_cover.search_images", lambda *_: (
-        "Wikimedia Commons", [(photo["url"], photo["credit"], photo["description"], photo["license"], "")]))
-    monkeypatch.setattr("app.radar.wa_cover.save_photo", lambda *_: photo)
+    monkeypatch.setattr("app.radar.wa_cover.search_images", Mock(side_effect=AssertionError("No topic search")))
+    monkeypatch.setattr("app.radar.reporting.report_sources", lambda *_: ([{}], photo))
     delivered = []
 
     def gateway_result(_method, _path, **params):
@@ -249,7 +253,7 @@ def test_topic_image_search_stays_in_chat_and_updates_selected_post(portal, monk
 
     monkeypatch.setattr("app.radar.wa_cover.gateway", gateway_result)
     run_cover_search()
-    assert "Wikimedia Commons" in delivered[0]["text"]
+    assert "Foto da reportagem original" in delivered[0]["text"]
     updated = send("USAR FOTO", delivered[0]["id"]).json["messages"]
     assert updated[0]["cover"].endswith(photo["path"])
     assert Post.query.one().featured_image == photo["path"]

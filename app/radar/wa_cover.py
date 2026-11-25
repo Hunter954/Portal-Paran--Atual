@@ -17,6 +17,13 @@ from .wa_cms import card_message, get_post, plain, preview, preview_version, req
 from .whatsapp import enabled, gateway, phone_number
 
 
+def generic_photo(photo):
+    """Known legacy topic-search results are not photos of the linked report."""
+    value = photo if isinstance(photo, dict) else {name: getattr(photo, name, "") for name in ("url", "description")}
+    return (urlsplit(value.get("url") or "").hostname in {"upload.wikimedia.org", "commons.wikimedia.org"}
+            or (value.get("description") or "").casefold().startswith("imagem ilustrativa"))
+
+
 def media_from_editor(value, image, *, library=False):
     credit = "Redação Paraná Atual"
     url, _, entered_credit = value.partition("|")
@@ -50,11 +57,13 @@ def queue_search(actor, group, target, title, location="", query=""):
     if existing >= 2:
         return "Você já tem duas buscas na fila. Os resultados chegam nesta conversa."
     db.session.add(CoverSearch(actor_id=actor, scope=group or "", term=term, location=location[:100], target=target))
-    return f"🔎 Buscando fotos de *{term}*. As opções chegam aqui."
+    return ("🔎 Buscando a foto na reportagem original. Ela chega nesta conversa com o crédito da fonte."
+            if target else f"🔎 Buscando fotos de *{term}*. As opções chegam aqui.")
 
 
 def queue_draft_cover(story, draft, actor, group):
-    if not draft.body.strip() or db.session.get(DraftMedia, draft.id):
+    media = db.session.get(DraftMedia, draft.id)
+    if not draft.body.strip() or (media and not generic_photo(media)):
         return
     target = {"story": story.id, "version": draft.version}
     recent = CoverSearch.query.filter(CoverSearch.scope == (group or ""),
@@ -125,6 +134,60 @@ def search_images(query, location=""):
         return "Busca de imagens", []
 
 
+def original_photo_messages(job, actor, scope):
+    """Resolve a preview only through its linked article, never through a topic search."""
+    from .reporting import report_sources
+    target = job.target
+    story, draft, post = None, None, None
+    if "story" in target:
+        story = db.session.get(Story, target["story"])
+        draft = latest_draft(story.id) if story else None
+        if not draft or story.state != "review" or draft.version != target.get("version"):
+            return None
+        source_url = story.articles[0].url if story.articles else ""
+    elif "post" in target:
+        post = get_post(target["post"])
+        if not post or preview_version(post) != target.get("version"):
+            return None
+        source_url = post.source_url or ""
+    else:
+        return None
+    photo = None
+    if source_url:
+        try:
+            _, photo = report_sources([{"url": source_url}])
+        except (FetchError, ValueError):
+            pass
+    if not photo or generic_photo(photo):
+        detail = f"\nFonte: {source_url}" if source_url else "\nEsta matéria não tem um link de reportagem original cadastrado."
+        return [{"id": "3EB0" + token_hex(9).upper(), "text":
+                 "Não consegui obter a foto da reportagem original. A prévia permanece sem foto."
+                 + detail + "\nVocê pode anexar a foto na prévia com o crédito."}]
+    if story:
+        # Fetching the source may take time. Do not attach it to a newer edit.
+        db.session.expire(story)
+        story = lock_story(story.id)
+        current = latest_draft(story.id)
+        if story.state != "review" or not current or current.version != target["version"]:
+            return None
+        old = db.session.get(DraftMedia, current.id)
+        if old and old.path == photo["path"] and old.credit == photo["credit"]:
+            saved = current
+        else:
+            saved = save_draft(story, {"titulo": current.title, "resumo": current.excerpt,
+                                     "corpo": current.body}, actor, photo=photo)
+            audit("foto_original_localizada", actor=actor, story=story.id, details=source_url[:300])
+        from .wa_editorial import draft_cards
+        return draft_cards(story, saved, actor, scope)
+    db.session.expire(post)
+    if preview_version(post) != target["version"]:
+        return None
+    text = f"🖼️ *Foto da reportagem original*\n{photo['credit']}\n{photo['description']}\nFonte: {source_url}"
+    text += "\n\nResponda *USAR FOTO*." if photo["license"] else "\n\nCom autorização, responda *USAR FOTO* seguida de quem autorizou."
+    return [card_message("photo", {"photo": photo, "target": target, "source_article": source_url},
+                         text, actor, scope, PUBLIC_URL + photo["path"])]
+
+
 def run_cover_search():
     if not enabled():
         return
@@ -154,6 +217,13 @@ def run_cover_search():
         if not config["connected"]:
             return
     actor, scope, target = job.actor_id, job.scope, job.target
+    if target:
+        messages = original_photo_messages(job, actor, scope)
+        if messages is None:
+            job.state = "cancelled"
+            db.session.commit()
+            return
+        return deliver_cover_messages(job, messages, config, phone)
     source, rows = search_images(job.term, job.location)
     fetcher, messages = PublicFetcher(), []
     for url, credit, description, license_text, origin in rows[:5]:
@@ -172,28 +242,21 @@ def run_cover_search():
         messages.append(card_message("photo", {"photo": photo, "target": target}, text, actor, scope, PUBLIC_URL + photo["path"]))
         if len(messages) == 3:
             break
-    if not messages and "story" in target:
-        from .reporting import report_sources
-        story = db.session.get(Story, target["story"])
-        draft = latest_draft(story.id) if story else None
-        if draft and story.state == "review" and draft.version == target["version"] and story.articles:
-            article = story.articles[0]
-            _, photo = report_sources([{"url": article.url}])
-            if photo:
-                use = ("Responda *USAR FOTO*." if photo["license"]
-                       else "Com autorização, responda *USAR FOTO* seguida de quem autorizou.")
-                caption = f"🖼️ *Foto da reportagem original*\n{photo['credit']}\n{photo['description']}\n\n{use}"
-                messages.append(card_message("photo", {"photo": photo, "target": target},
-                                             caption, actor, scope, PUBLIC_URL + photo["path"]))
     if not messages:
         messages = [{"id": "3EB0" + token_hex(9).upper(),
                      "text": "Não encontrei uma foto para esse assunto. Tente *BUSCAR FOTO* com o nome do local ou envie sua foto na prévia."}]
+    deliver_cover_messages(job, messages, config, phone)
+
+
+def deliver_cover_messages(job, messages, config, phone):
+    for message in messages:
+        message.setdefault("id", "3EB0" + token_hex(9).upper())
     job.state = "sending"
     db.session.commit()
     try:
         if config:
             result = gateway("POST", "/radar/group/reply", timeout=(3, 35),
-                             json={"group_id": scope, "revision": config["revision"], "messages": messages})
+                             json={"group_id": job.scope, "revision": config["revision"], "messages": messages})
         else:
             result = gateway("POST", "/radar/reply", timeout=(3, 35), json={"phone": phone, "messages": messages})
         job.state = "sent" if result.get("accepted") else "failed"
@@ -210,6 +273,8 @@ def use_photo(card, text, actor, group):
     photo, target = dict(card.data["photo"]), card.data["target"]
     if not target:
         return "Abra a matéria e busque a foto a partir da prévia para vincular à publicação."
+    if not card.data.get("source_article") or generic_photo(photo):
+        raise EditorialError("Essa sugestão antiga não foi obtida da reportagem original. Responda *BUSCAR FOTO* na prévia atual.")
     if not photo["license"]:
         if len(parts) != 3 or not 3 <= len(parts[2]) <= 250:
             raise EditorialError("Responda *USAR FOTO* seguida de quem autorizou o uso público.")

@@ -29,7 +29,8 @@ def structured_data(page):
             if isinstance(graph, list):
                 nodes.extend(graph)
             kind = node.get("@type")
-            if kind in ("NewsArticle", "Article", "ReportageNewsArticle"):
+            kinds = kind if isinstance(kind, list) else [kind]
+            if any(name in ("NewsArticle", "Article", "ReportageNewsArticle") for name in kinds):
                 return node
     return {}
 
@@ -53,27 +54,51 @@ def article_paragraphs(page, schema):
 
 
 def photo_candidates(page, url, schema):
-    image = schema.get("image")
-    for entry in image if isinstance(image, list) else [image]:
-        if isinstance(entry, dict) and isinstance(entry.get("url"), str) and isinstance(entry.get("creditText"), str):
-            caption = entry.get("caption")
-            license_url = entry.get("license")
-            compatible = isinstance(license_url, str) and re.fullmatch(
-                r"https?://creativecommons\.org/(?:licenses/by|publicdomain/(?:zero|mark))/(?:3\.0|4\.0|1\.0)/?",
-                license_url,
-            )
-            yield (urljoin(url, entry["url"]), clean(entry["creditText"]),
-                   clean(caption) if isinstance(caption, str) else "", license_url if compatible else None)
+    missing_credit = "Crédito não informado na reportagem original"
+    seen = set()
+    def candidate(reference, credit="", description="", license_url=None):
+        if not isinstance(reference, str) or not reference or reference.startswith("data:"):
+            return None
+        absolute = urljoin(url, reference)
+        if absolute in seen or re.search(r"(?:^|[/_-])(logo|sprite|favicon|placeholder)(?:[/_.-]|$)", absolute, re.I):
+            return None
+        seen.add(absolute)
+        compatible = isinstance(license_url, str) and re.fullmatch(
+            r"https?://creativecommons\.org/(?:licenses/by|publicdomain/(?:zero|mark))/(?:3\.0|4\.0|1\.0)/?", license_url)
+        return absolute, clean(credit) or missing_credit, clean(description), license_url if compatible else None
     for figure in page.select("article figure, main figure, .mc-article-body figure, figure.content-media-figure")[:12]:
+        if any(parent.name in {"aside", "nav", "footer"} or re.search(
+                r"related|recommend|sidebar|advert|publicidade|more-news|leia-tambem",
+                " ".join(parent.get("class", [])), re.I) for parent in [figure, *figure.parents] if getattr(parent, "attrs", None) is not None):
+            continue
         img, caption = figure.find(["img", "amp-img"]), figure.find("figcaption")
         if not img:
             continue
-        caption = re.sub(r"^\d+\s+de\s+\d+\s*", "", clean(caption.get_text(" ", strip=True))) if caption else ""
+        caption = re.sub(r"^\d+\s+de\s+\d+\s*", "", clean(caption.get_text(" ", strip=True))) if caption else clean(img.get("alt") or "")
         description, _, credit = re.split(r"\s*[—–-]?\s*(Foto|Imagem|Crédito)\s*:\s*", caption, maxsplit=1,
                                             flags=re.I) if re.search(r"(Foto|Imagem|Crédito)\s*:", caption, re.I) else (caption, "", "")
         reference = img.get("data-src") or img.get("data-original") or img.get("src")
-        if reference and not reference.startswith("data:"):
-            yield urljoin(url, reference), clean(credit), clean(description), None
+        if value := candidate(reference, credit, description):
+            yield value
+    image = schema.get("image")
+    for entry in image if isinstance(image, list) else [image]:
+        if isinstance(entry, str):
+            value = candidate(entry)
+        elif isinstance(entry, dict):
+            creator = entry.get("creator")
+            credit = entry.get("creditText") or (creator.get("name") if isinstance(creator, dict) else creator) or ""
+            value = candidate(entry.get("url") or entry.get("contentUrl"), credit if isinstance(credit, str) else "",
+                              entry.get("caption") if isinstance(entry.get("caption"), str) else "", entry.get("license"))
+        else:
+            value = None
+        if value:
+            yield value
+    # A share image is considered only on an identified article page; never search results or a site's logo.
+    article_type = page.select_one('meta[property="og:type"][content="article"]')
+    if schema or (article_type and page.find("h1")):
+        for node in page.select('meta[property="og:image"],meta[name="twitter:image"]'):
+            if value := candidate(node.get("content")):
+                yield value
 
 
 def image_extension(headers, body):

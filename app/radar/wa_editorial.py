@@ -63,6 +63,9 @@ def story_card(story, actor, group):
 def draft_cards(story, draft, actor, group):
     from .group_delivery import PUBLIC_URL
     photo = db.session.get(DraftMedia, draft.id)
+    from .wa_cover import generic_photo
+    if photo and generic_photo(photo):
+        photo = None
     images = [{"text": f"Foto: {photo.credit}" + (f"\n{photo.description}" if photo.description else ""),
                "cover": PUBLIC_URL + photo.path}] if photo else []
     source = story.articles[0]
@@ -77,7 +80,7 @@ def draft_cards(story, draft, actor, group):
             snippet = " ".join(words[:24])
             full += "\n\nTrecho da fonte\n" + snippet + ("…" if len(words) > 24 else "")
     if draft.body.strip() and not photo:
-        full += "\nCapa: a busca de fotos pode chegar em seguida."
+        full += "\nFoto: buscando na reportagem original."
     elif photo and not photo.license:
         full += "\nFoto de referência. Se tiver autorização de uso, responda *FOTO AUTORIZADA* seguida de quem autorizou."
     if draft.pending:
