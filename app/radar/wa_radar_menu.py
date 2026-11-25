@@ -71,7 +71,10 @@ def list_pr(state,actor,group,urgent=False,page=0,cursors=None):
     step(state,'radar_list',ids=[s.id for s in items],urgent=urgent,page=page,cursors=cursors,more=len(rows)>5)
     if not items:return 'Nenhuma pauta nessa fila agora.\n\n*8* Atualizar lista\n*0* Menu do Radar'
     title='Urgentes do Paraná' if urgent else 'Pautas do Paraná'
-    text='📡 *'+title+'*\n\n'+'\n\n'.join(f'*{i}* #{s.id} · {s.title[:210]}\n{s.location} · {s.articles[0].source.name[:70]}' for i,s in enumerate(items,1))
+    text = '📡 *' + title + '*\n\n' + '\n\n'.join(
+        f'*{i}* #{story.id} · {story.title[:210]}\n{story.location} · {story.articles[0].source.name[:70]}'
+        + (' · Prévia pronta' if ready_preview(story) else '') for i, story in enumerate(items, 1)
+    )
     text+='\n\nEscolha o número da pauta.'
     if len(rows)>5:text+='\n*6* Próxima página'
     if page:text+='\n*7* Página anterior'
@@ -94,9 +97,43 @@ def detail(state,story,actor,group,previous=None):
     from .wa_editorial import reply_card
     first=story.articles[0]
     step(state,'radar_story',story_id=story.id,return_to=previous or state.data.get('return_to'))
-    text=f'*Pauta #{story.id}*\n\n*{story.title}*\n{first.summary[:650]}\n\nFonte: {first.source.name}\n{first.url}\n\n'+current_options(state)
+    summary = story_summary(first.summary, first.title)
+    options = current_options(state)
+    if ready_preview(story):
+        options = options.replace('Preparar prévia', 'Abrir prévia pronta')
+    text=f'*Pauta #{story.id}*\n\n*{story.title}*\n{summary}\n\nFonte: {first.source.name}\n{first.url}\n\n'+options
     card=reply_card(story,text,actor,group);state.data={**state.data,'quote_id':card['id']}
     return {'messages':[card]}
+
+
+def story_summary(summary, title):
+    clean_lines = [line.strip() for line in summary.splitlines()
+                   if line.strip() and ' no whatsapp' not in line.casefold()]
+    if len(clean_lines) > 1:
+        lead = clean_lines[0]
+        if normalize(lead) == normalize(title) or (
+            not lead.endswith(('.', '!', '?')) and len(lead) < 120 and len(clean_lines[1]) > len(lead)
+        ):
+            clean_lines = clean_lines[1:]
+    text = ' '.join(clean_lines)
+    if text.endswith(('De acordo com o', 'De acordo com a', 'Segundo o', 'Segundo a')):
+        text = text.rsplit('.', 1)[0] + '.' if '.' in text else ''
+    if len(text) <= 650:
+        return text
+    return text[:647].rsplit(' ', 1)[0] + '…'
+
+
+def ready_preview(story):
+    if story.state != 'review':
+        return False
+    from .models import DraftMedia
+    from .wa_cover import generic_photo
+    from .wa_editorial import legacy_draft
+    draft = latest_draft(story.id)
+    if draft is None or not draft.body.strip() or legacy_draft(draft):
+        return False
+    photo = db.session.get(DraftMedia, draft.id)
+    return bool(photo and not generic_photo(photo))
 
 def remember_preview(story,draft,actor,group,card_id):
     if not actor:return

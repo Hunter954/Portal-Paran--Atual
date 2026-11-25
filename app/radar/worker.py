@@ -79,7 +79,7 @@ def prefetch_job():
     latest = [story.id for story in Story.query.filter(Story.region != MANUAL_REGION,
         Story.state.in_(("new", "research", "production", "review")),
         Story.created >= now() - timedelta(days=7), Story.articles.any(),
-    ).order_by(Story.id.desc()).limit(4)]
+    ).order_by(Story.id.desc()).limit(5)]
     if not latest:
         return None
     candidate = Story.query.filter(Story.id.in_(latest), Story.state.in_(("new", "research")),
