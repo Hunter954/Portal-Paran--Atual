@@ -262,7 +262,7 @@ def test_editorial_interruption_keeps_sources_available_and_blocks_empty_publica
     send, _ = provision(portal, monkeypatch)
     seed(1)
     story = Story.query.one()
-    assert "Envio o texto primeiro" in send(f"RADAR VER {story.id}").json["reply"]
+    assert "texto e a foto original" in send(f"RADAR VER {story.id}").json["reply"]
 
     def timeout(_sources):
         raise EditorialError("O modelo local demorou mais que o limite.")

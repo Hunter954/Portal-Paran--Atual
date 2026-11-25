@@ -38,7 +38,7 @@ def current_options(state):
     if state.step=='radar_period':return PERIOD
     if state.step=='radar_search_wait':return '*1* Verificar resultado\n*2* Fazer outra busca\n*0* Menu do Radar'
     if state.step in {'radar_search','radar_edit_text','radar_photo'}:return '*0* Voltar ao Radar'
-    if state.step=='radar_wait':return '*1* Verificar prévia\n*8* Voltar à lista\n*0* Menu do Radar'
+    if state.step=='radar_wait':return '*1* Ver andamento\n*2* Ver reportagem original\n*8* Voltar à lista\n*0* Menu do Radar'
     if state.step=='radar_edit':return '*1* Título\n*2* Resumo\n*3* Texto completo\n*4* Enviar foto\n*5* Voltar à prévia\n*0* Menu do Radar'
     if state.step=='radar_story':return '*1* Preparar prévia\n*2* Ver fontes\n*8* Voltar à lista\n*0* Menu do Radar'
     if state.step=='radar_result':return '*1* Preparar matéria desta reportagem\n*2* Ver reportagem original\n*8* Voltar aos resultados\n*9* Fazer outra busca\n*0* Menu do Radar'
@@ -115,6 +115,18 @@ def history(state,actor,group):
     if not rows:return 'Você ainda não fez buscas nesta conversa.\n\n*9* Fazer uma busca\n*0* Menu do Radar'
     return '🕘 *Minhas buscas*\n\n'+'\n'.join(f'*{i}* {r.term[:100]} · {len(r.results)} resultados' for i,r in enumerate(rows,1))+'\n\n*9* Nova busca\n*0* Menu do Radar'
 
+def prepare_complete(story,actor,group):
+    from .models import DraftMedia
+    from .wa_editorial import request_draft,legacy_draft
+    from .wa_cover import queue_draft_cover,generic_photo
+    draft=latest_draft(story.id)
+    if draft and draft.body.strip() and story.state=='review' and not legacy_draft(draft):
+        photo=db.session.get(DraftMedia,draft.id)
+        if not photo or generic_photo(photo):
+            queue_draft_cover(story,draft,actor,group)
+            return 'O texto já está pronto. Estou localizando a foto original para enviar a prévia completa aqui.'
+    return request_draft(story,actor,group)
+
 def handle(state,text,actor,group,quote_id=None,image=None):
     from .wa_editorial import quoted_card,radar_command,request_draft,edit_draft,save_cover_from_message
     from .manual_search import selected_search,request_search,import_result
@@ -179,8 +191,10 @@ def handle(state,text,actor,group,quote_id=None,image=None):
         if value=='7' and offset:return show_results(state,job,actor,group,max(0,offset-5))
         if 1<=int(value)<=min(5,len(job.results)-offset):
             index=offset+int(value)-1;row=job.results[index];previous=context(state)
-            step(state,'radar_result',search_id=job.id,index=index,return_to=previous)
-            return f"*{row['title']}*\n\n{row['summary']}\n\nFonte: {row['source']} · {date_label(row.get('published'))}\n{row['url']}\n\n"+current_options(state)
+            story=import_result(job,index,actor)
+            step(state,'radar_wait',story_id=story.id,return_to=previous)
+            result=prepare_complete(story,actor,group)
+            return result if isinstance(result,dict) else f"*{row['title']}*\nFonte: {row['source']}\n\n"+result+'\n\n'+current_options(state)
     elif state.step=='radar_result':
         if value=='9':return search_prompt(state)
         if value=='8':return back_to_list(state,actor,group)
@@ -189,7 +203,7 @@ def handle(state,text,actor,group,quote_id=None,image=None):
         if value=='1':
             story=import_result(job,data['index'],actor)
             step(state,'radar_wait',story_id=story.id,return_to=data.get('return_to'))
-            result=request_draft(story,actor,group)
+            result=prepare_complete(story,actor,group)
             return result if isinstance(result,dict) else result+'\n\n'+current_options(state)
     elif state.step=='radar_list':
         if value=='8':return list_pr(state,actor,group,data['urgent'])
@@ -206,7 +220,7 @@ def handle(state,text,actor,group,quote_id=None,image=None):
             if value=='2':return radar_command('FONTES',actor,group,data['quote_id'])+'\n\n'+current_options(state)
             if value=='1':
                 step(state,'radar_wait',**{k:v for k,v in data.items() if k!='radar_ui'})
-                result=radar_command('POSTAR',actor,group,data['quote_id'])
+                result=prepare_complete(db.session.get(Story,data['story_id']),actor,group)
                 return result if isinstance(result,dict) else result+'\n\n'+current_options(state)
         else:
             commands={'1':'PUBLICAR','2':'REFAZER','3':'BUSCAR FOTO','4':'FONTES','6':'APURADO'}
@@ -228,10 +242,30 @@ def handle(state,text,actor,group,quote_id=None,image=None):
             step(state,'radar_photo',**{k:v for k,v in data.items() if k!='radar_ui'});return 'Envie a foto nesta conversa. A legenda pode informar o crédito.\n\n*0* Menu do Radar'
     elif state.step=='radar_wait':
         if value=='8':return back_to_list(state,actor,group)
+        if value=='2':
+            story=db.session.get(Story,data['story_id'])
+            return story.articles[0].url+'\n\n'+current_options(state)
         if value=='1':
             story=db.session.get(Story,data['story_id']);draft=latest_draft(story.id) if story else None
             if story and story.state=='review' and draft:
+                from .models import DraftMedia,CoverSearch
+                photo=db.session.get(DraftMedia,draft.id)
+                pending=CoverSearch.query.filter_by(scope=group or '',state='pending').all() if not photo else []
+                if any(row.target=={'story':story.id,'version':draft.version} for row in pending):
+                    return 'O texto está pronto. Aguardando a foto original para enviar tudo junto.\n\n'+current_options(state)
                 from .wa_editorial import draft_cards
                 return {'messages':draft_cards(story,draft,actor,group)}
-            return 'A prévia ainda está sendo preparada.\n\n'+current_options(state)
+            from .models import Job,Audit
+            job=Job.query.filter_by(story_id=data['story_id']).order_by(Job.id.desc()).first()
+            if job and job.state=='running':
+                seconds=max(0,round((now()-job.started).total_seconds())) if job.started else 0
+                read=Audit.query.filter(Audit.story_id==job.story_id,Audit.action=='reportagem_lida',Audit.created>=job.started).first() if job.started else None
+                status='Preparando o texto e a foto original' if read else 'Lendo a reportagem e localizando a foto'
+                return f'{status} · {seconds}s. A prévia chega automaticamente aqui.\n\n'+current_options(state)
+            if job and job.state=='error':
+                step(state,'radar_story',**{k:v for k,v in data.items() if k!='radar_ui'})
+                if not state.data.get('quote_id'):
+                    return detail(state,db.session.get(Story,data['story_id']),actor,group,data.get('return_to'))
+                return 'Não consegui concluir a preparação: '+(job.error or 'falha na fonte')+'\n\n'+current_options(state)
+            return 'Sua matéria está na fila prioritária. A prévia com texto e foto chega automaticamente aqui.\n\n'+current_options(state)
     return 'Escolha uma das opções exibidas.\n\n'+current_options(state)

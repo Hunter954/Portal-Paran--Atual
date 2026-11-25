@@ -125,7 +125,7 @@ def generate(sources):
             session.trust_env = False
             response = session.post(base.rstrip("/") + "/api/chat", timeout=(3, 38), allow_redirects=False,
                                     json={"model": model_name(), "format": SCHEMA, "stream": False, "think": False,
-                                          "keep_alive": "12m", "options": {"num_ctx": 2048, "num_thread": 3, "num_predict": 225,
+                                          "keep_alive": "24h", "options": {"num_ctx": 2048, "num_thread": 4, "num_predict": 225,
                                                                         "temperature": 0.1},
                                           "messages": [{"role": "system", "content": SYSTEM_PROMPT},
                                                        {"role": "user", "content": "\n\n".join(material)}]})
@@ -222,6 +222,7 @@ def validate_draft(output, source_ids):
 
 
 def run_job(job):
+    from concurrent.futures import ThreadPoolExecutor, Future
     start = monotonic()
     job_id, story_id, actor_id = job.id, job.story_id, job.actor_id
     story = db.session.get(Story, story_id)
@@ -232,12 +233,21 @@ def run_job(job):
     previous_id = previous.id if previous else None
     job.state, job.started = "running", now()
     db.session.commit()
-    try:
-        sources, _ = report_sources(sources, include_photo=False)
-        output = generate(sources)
-        error = None
-    except EditorialError as exc:
-        error = str(exc)
+    photo = None
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix='radar-photo') as photos:
+        try:
+            sources, photo = report_sources(sources, photo_executor=photos)
+            audit('reportagem_lida', actor=actor_id, story=story_id, details=f'Job {job_id} · texto e foto em preparação')
+            db.session.commit()
+            output = generate(sources)
+            error = None
+        except EditorialError as exc:
+            error = str(exc)
+        if isinstance(photo, Future):
+            try:
+                photo = photo.result()
+            except (ValueError, OSError):
+                photo = None
     story = lock_story(story_id)
     draft = latest_draft(story_id)
     job = db.session.get(Job, job_id, populate_existing=True)
@@ -255,7 +265,7 @@ def run_job(job):
         audit("geracao_falhou", actor=actor_id, story=story_id, details=job.error)
     else:
         label = "fontes" if fallback else model_name()
-        saved = save_draft(story, output, actor_id, model=label + ":" + PROMPT_VERSION)
+        saved = save_draft(story, output, actor_id, model=label + ":" + PROMPT_VERSION, photo=photo)
         job.state = "done"
         elapsed = round(monotonic() - start, 1)
         audit("redacao_pendente" if fallback else "geracao_concluida", actor=actor_id, story=story_id,

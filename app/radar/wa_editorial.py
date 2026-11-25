@@ -72,16 +72,22 @@ def draft_cards(story, draft, actor, group):
         if words:
             snippet = " ".join(words[:24])
             full += "\n\nTrecho da fonte\n" + snippet + ("…" if len(words) > 24 else "")
-    if draft.body.strip() and not photo:
-        full += "\nFoto: buscando na reportagem original."
+    if photo:
+        full += f"\n\nFoto: {photo.credit}"
+        if photo.description:
+            full += '\n' + photo.description
+    elif draft.body.strip():
+        full += "\nFoto original indisponível. Use 5 → 4 para enviar a foto ou 3 para tentar buscá-la novamente."
     if draft.pending:
         full += "\n\nA conferir: " + " · ".join(draft.pending[:2])
     from .wa_radar_menu import PREVIEW, remember_preview
     confirmation = PREVIEW
     if len(full) + len(confirmation) + 2 <= 3100:
         card = reply_card(story, full + "\n\n" + confirmation, actor, group, draft)
+        if photo:
+            card['cover'] = PUBLIC_URL + photo.path
         remember_preview(story,draft,actor,group,card['id'])
-        return [*images, card]
+        return [card]
     chunks = []
     remaining = full
     while remaining:
@@ -154,7 +160,7 @@ def request_draft(story, actor, group, *, fresh=False):
     previous = ChatDraftReply.query.filter_by(job_id=job.id, actor_id=actor, scope=group or "").first()
     if not previous:
         db.session.add(ChatDraftReply(job_id=job.id, actor_id=actor, scope=group or ""))
-    return f"Estou lendo a reportagem da pauta *#{story.id}*. Envio o texto primeiro e as fotos em seguida."
+    return f"Estou lendo a reportagem da pauta *#{story.id}*. A prévia chega aqui automaticamente com o texto e a foto original."
 
 
 def confirm_story(story, version, actor, group=None):

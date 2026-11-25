@@ -95,9 +95,9 @@ def test_free_search_delivers_real_results_and_full_numbered_publish_preserves_o
     assert '*6* Próxima página' in delivered[0]['text'] and 'Checagem' in delivered[0]['text']
     assert Post.query.count()==0 and Story.query.count()==0
     assert 'Checagem 6:' in send('6').json['reply'];send('7')
-    assert 'Ver reportagem original' in send('1').json['reply']
-    assert result()['url'] in send('2').json['reply']
     assert 'lendo a reportagem' in send('1').json['reply']
+    assert result()['url'] in send('2').json['reply']
+    assert 'fila prioritária' in send('1').json['reply']
     story=Story.query.one();article=story.articles[0]
     assert story.title==result()['title'] and story.title!=job.term and story.region==MANUAL_REGION
     assert not article.source.active and article.source.archived

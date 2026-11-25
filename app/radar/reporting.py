@@ -151,7 +151,13 @@ def store_photo(body, headers, credit, description, url="", license_text=None, *
     return {"path": f"{current_app.config['MEDIA_URL_PREFIX'].rstrip('/')}/{folder}/{filename}",
             "credit": credit[:255], "description": description[:500], "url": url[:1000], "license": license_text}
 
-def report_sources(sources, *, include_photo=True):
+def download_article_photo(app, candidates):
+    # Only candidates extracted from this article are passed to the background download.
+    with app.app_context():
+        return save_photo(PublicFetcher(), candidates[:3])
+
+
+def report_sources(sources, *, include_photo=True, photo_executor=None):
     fetcher = PublicFetcher()
     photo = None
     for index, source in enumerate(sources):
@@ -169,5 +175,7 @@ def report_sources(sources, *, include_photo=True):
             date = page.find("meta", attrs={"property": "article:published_time"})
             source["publicado"] = schema.get("datePublished") or (date.get("content") if date else None) or source.get("publicado")
         if include_photo and index == 0:
-            photo = save_photo(fetcher, photo_candidates(page, response.url, schema))
+            candidates = list(photo_candidates(page, response.url, schema))
+            photo = (photo_executor.submit(download_article_photo, current_app._get_current_object(), candidates)
+                     if photo_executor is not None else save_photo(fetcher, candidates))
     return sources, photo

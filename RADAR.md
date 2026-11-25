@@ -52,7 +52,7 @@ Use MENU, 2 e 1 para criar uma matéria normal. Envie primeiro o título e o tex
 
 Nas prévias do Radar e nas matérias com fonte cadastrada, BUSCAR FOTO consulta exclusivamente a reportagem vinculada. A foto original e seu crédito são anexados à versão atual da prévia e enviados ao WhatsApp. Não há busca por assunto, Google ou Wikimedia como alternativa para essas capas. Se a imagem não puder ser obtida, o bot avisa e mantém a prévia sem foto. Sugestões antigas sem vínculo com a reportagem não podem ser anexadas; imagens enviadas pela redação continuam disponíveis.
 
-O worker editorial prepara até quatro pautas recentes enquanto a fila está vazia e atende pedidos do WhatsApp primeiro. Texto e fotos seguem em filas independentes. Se a geração ficar incompleta, a conversa recebe as fontes e a opção 5 para editar o texto e concluir a prévia com revisão. A publicação continua vinculada à confirmação da versão.
+O worker editorial prepara até quatro pautas recentes enquanto a fila está vazia e atende pedidos do WhatsApp primeiro. A reportagem é lida uma vez; o download da foto original acontece durante a geração do texto. A primeira prévia pronta inclui texto, foto e crédito na mesma mensagem. Se a geração ficar incompleta, a conversa recebe as fontes e a opção 5 para editar o texto e concluir a prévia com revisão. A publicação continua vinculada à confirmação da versão.
 
 
 ## Fotos originais — correção de 24/11/2026
@@ -69,6 +69,15 @@ Portal e worker usam `parana-atual-radar:publish-original-photo-20261124`. O Rad
 
 O caminho MENU → 9 → 3 solicita apenas o assunto e oferece períodos de 7 dias, 30 dias ou sem limite de data. O worker consulta o RSS público do Bing Notícias, decodifica os links originais e mostra título, fonte e data de cada resultado. A consulta não vira uma alegação factual e as miniaturas do buscador são ignoradas. A foto continua vindo da reportagem selecionada pelo fluxo de fotos originais, com a mesma imagem na prévia e na publicação.
 
-Escolher um resultado exibe a reportagem; preparar a matéria é uma ação separada. O resultado importado usa a região interna Busca livre e uma fonte inativa e arquivada, sem ampliar o monitoramento, a fila automática, os alertas ou a preparação antecipada de pautas do Paraná. O histórico é limitado ao administrador e à conversa. Navegar para outro menu ou iniciar outra busca impede a entrega de resultados antigos naquela navegação.
+Escolher um resultado inicia a preparação da matéria. A publicação continua exigindo a escolha de PUBLICAR na prévia. O resultado importado usa a região interna Busca livre e uma fonte inativa e arquivada, sem ampliar o monitoramento, a fila automática, os alertas ou a preparação antecipada de pautas do Paraná. O histórico é limitado ao administrador e à conversa. Navegar para outro menu ou iniciar outra busca impede a entrega de resultados antigos naquela navegação.
 
 A migração aditiva cria radar_manual_searches. Portal e worker usam a imagem parana-atual-radar:search-menu-20261124. O gateway e os grupos existentes são preservados. As escolhas são numeradas em mensagens de texto, sem exigir que o editor memorize comandos. Somente o assunto pesquisado e os campos em edição são texto livre.
+
+
+## Prévia com foto e preparação mais rápida — 24/11/2026
+
+Selecionar uma reportagem da busca já inicia a preparação. O worker lê o artigo uma vez e baixa a foto original em paralelo à redação. A foto é gravada na mesma versão do rascunho antes da entrega. A prévia padrão chega como uma imagem cuja legenda contém título, texto, fonte, crédito e opções de revisão. Textos longos são divididos em mensagens do mesmo envio. A versão e a origem da foto continuam verificadas antes de anexar ou publicar.
+
+A geração usa o mesmo modelo qwen3.5:2b-q4_K_M com o mesmo formato editorial de manchete, subtítulo e dois parágrafos. A inferência usa quatro threads em vez de três e o limite de CPU do Ollama passa de três para quatro núcleos, preservando os demais limites. O modelo fica carregado por 24 horas para reduzir a espera por inicialização. As validações de fonte acessível, números, idioma, atribuições e semelhança continuam ativas. O andamento informa a leitura, a redação e o tempo transcorrido, com entrega automática da prévia. Se a foto não puder ser obtida, a prévia informa a falha e oferece tentar novamente ou enviar uma imagem; a publicação continua aguardando uma foto válida.
+
+Portal e worker: parana-atual-radar:photo-speed-20261124. Não há alteração de esquema nem de grupo do WhatsApp.
