@@ -309,14 +309,14 @@ def publish(story, version, actor_id):
         from .wa_cover import generic_photo
         if generic_photo(photo):
             raise EditorialError("A foto antiga não pertence à reportagem original. Busque a foto na prévia atual antes de publicar.")
-    if photo and not photo.license:
-        photo = None
+    if not photo:
+        raise EditorialError("A foto da matéria ainda não está disponível. Busque ou envie a foto na prévia antes de publicar.")
     category = Category.query.filter_by(name=story.category).first() if story.category else None
     post = Post(source="radar", source_url=originals[0], title=escape(draft.title),
                 slug=_ensure_unique_slug(Post, draft.title), excerpt=escape(draft.excerpt),
-                featured_image=photo.path if photo else "/static/img/logo-parana-atual.svg",
-                image_credit=photo.credit if photo else None,
-                image_description=photo.description if photo else None,
+                featured_image=photo.path,
+                image_credit=photo.credit,
+                image_description=photo.description,
                 content_html=published_text(draft.body, story.articles),
                 author_name="Redação Paraná Atual", published_at=now(), updated_at=now())
     if category:

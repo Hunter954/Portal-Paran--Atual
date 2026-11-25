@@ -144,9 +144,11 @@ def publish_post(post, actor, group, scheduled=None):
         raise EditorialError("A matéria precisa de um texto.")
     if post.published_at and post.published_at <= now():
         return f"Essa matéria já está no ar.\n{public_url_for(post)}"
+    from .wa_cover import generic_photo
+    if (not post.featured_image or post.featured_image.startswith('/static/img/')
+            or generic_photo({'url': post.featured_image, 'description': post.image_description or ''})):
+        raise EditorialError("A foto da matéria ainda não está disponível. Busque ou envie a foto na prévia antes de publicar.")
     post.published_at, post.updated_at = scheduled or now(), now()
-    if not post.featured_image:
-        post.featured_image = "/static/img/logo-parana-atual.svg"
     audit("whatsapp_cms_agendada" if scheduled else "whatsapp_cms_publicada", actor=actor, details=f"Matéria #{post.id}")
     if scheduled:
         local = scheduled.replace(tzinfo=timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))

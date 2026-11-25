@@ -40,7 +40,7 @@ A captura usa `PARANAATUAL_AD_REPORTS_URL` e `PARANAATUAL_AD_REPORTS_TOKEN`. Exe
 
 Digite MENU e escolha 9, ou use RADAR LISTAR 10. Cada pauta chega em uma mensagem pr?pria. Informe outra quantidade, use MAIS para continuar ou RADAR REENVIAR para repetir a consulta. RADAR URGENTES 10 filtra as pautas com pontua??o a partir de 75. Os alertas autom?ticos seguem o limite escolhido e a data de ativa??o, enquanto a listagem manual inclui o hist?rico aberto.
 
-Responda POSTAR na mensagem da pauta para receber a prévia. O worker lê a reportagem completa e procura a foto creditada no artigo. Imagens de referência ficam na prévia autenticada. Quando houver licença compatível ou o editor registrar a permissão com FOTO AUTORIZADA seguida da origem, a imagem vira capa pública. Nos outros casos, o portal usa a arte do site. Na prévia responda PUBLICAR para confirmar ou REFAZER para gerar outro texto. TÍTULO, RESUMO e TEXTO continuam disponíveis para edições pontuais. A prévia e a capa são associadas à versão atual da pauta.
+Responda POSTAR na mensagem da pauta para receber a prévia. O worker lê a reportagem completa e procura a foto creditada no artigo. A foto anexada à prévia é preservada na publicação, junto com o crédito cadastrado. O campo de licença permanece como metadado; quando estiver vazio, a foto não é descartada. Sem uma foto válida, a publicação aguarda a imagem e informa o editor. Na prévia responda PUBLICAR para confirmar ou REFAZER para gerar outro texto. TÍTULO, RESUMO e TEXTO continuam disponíveis para edições pontuais. A prévia e a capa são associadas à versão atual da pauta.
 
 A migra??o cria radar_chat_sessions, radar_chat_cards, radar_chat_draft_replies e radar_draft_media. A configura??o do grupo e os alertas permanecem no gateway existente. A publica??o conserva as permiss?es definidas em RADAR_PUBLISHER_IDS e as verifica??es de duplicidade do Radar.
 
@@ -58,3 +58,8 @@ O worker editorial prepara até quatro pautas recentes enquanto a fila está vaz
 ## Fotos originais — correção de 24/11/2026
 
 Imagem do portal e do worker: `parana-atual-radar:original-article-photo-20261124`. A prévia #98 foi usada para conferir a extração da foto creditada a Bruno Fernandes na reportagem original do g1. A foto foi verificada por SHA-256, sem alterações nos pixels. Os 49 testes do portal e do Radar passaram, incluindo falha de extração, isolamento de versões, bloqueio de cartões antigos e envio da foto no fluxo de prévia. A busca genérica continua restrita à consulta explícita de imagens na biblioteca, sem vincular seus resultados às matérias.
+
+
+## Publicação preserva a foto — 24/11/2026
+
+Portal e worker usam `parana-atual-radar:publish-original-photo-20261124`. O Radar publica a mesma imagem da versão aprovada, com crédito e descrição, sem substituir o arquivo por uma logo quando o campo de licença está vazio. O CMS no WhatsApp também aguarda uma foto quando a matéria não tem imagem válida. Os 52 testes aprovados incluem o fluxo completo de extração, prévia, PUBLICAR, página pública, crédito, Open Graph e acesso anônimo aos mesmos bytes da foto.

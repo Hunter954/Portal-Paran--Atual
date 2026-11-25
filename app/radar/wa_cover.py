@@ -183,7 +183,7 @@ def original_photo_messages(job, actor, scope):
     if preview_version(post) != target["version"]:
         return None
     text = f"🖼️ *Foto da reportagem original*\n{photo['credit']}\n{photo['description']}\nFonte: {source_url}"
-    text += "\n\nResponda *USAR FOTO*." if photo["license"] else "\n\nCom autorização, responda *USAR FOTO* seguida de quem autorizou."
+    text += "\n\nResponda *USAR FOTO*."
     return [card_message("photo", {"photo": photo, "target": target, "source_article": source_url},
                          text, actor, scope, PUBLIC_URL + photo["path"])]
 
@@ -275,10 +275,6 @@ def use_photo(card, text, actor, group):
         return "Abra a matéria e busque a foto a partir da prévia para vincular à publicação."
     if not card.data.get("source_article") or generic_photo(photo):
         raise EditorialError("Essa sugestão antiga não foi obtida da reportagem original. Responda *BUSCAR FOTO* na prévia atual.")
-    if not photo["license"]:
-        if len(parts) != 3 or not 3 <= len(parts[2]) <= 250:
-            raise EditorialError("Responda *USAR FOTO* seguida de quem autorizou o uso público.")
-        photo["license"] = parts[2].strip()
     if "post" in target:
         post = get_post(target["post"])
         if not post or preview_version(post) != target["version"]:

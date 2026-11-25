@@ -171,6 +171,9 @@ def test_duplicate_and_publication_require_current_version(portal, monkeypatch):
     story.approved_draft_id = draft.id
     with pytest.raises(EditorialError):
         publish(story, draft.version + 1, user_id)
+    from app.radar.models import DraftMedia
+    db.session.add(DraftMedia(draft_id=draft.id,path='/media/radar/source.jpg',url='https://site.com.br/source.jpg',
+                              credit='Foto da fonte',description='Temporal em Curitiba'))
     post = publish(story, draft.version, user_id)
     db.session.commit()
     assert post.id == publish(story, draft.version, user_id).id

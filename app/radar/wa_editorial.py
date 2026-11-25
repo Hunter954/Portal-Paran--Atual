@@ -81,8 +81,6 @@ def draft_cards(story, draft, actor, group):
             full += "\n\nTrecho da fonte\n" + snippet + ("…" if len(words) > 24 else "")
     if draft.body.strip() and not photo:
         full += "\nFoto: buscando na reportagem original."
-    elif photo and not photo.license:
-        full += "\nFoto de referência. Se tiver autorização de uso, responda *FOTO AUTORIZADA* seguida de quem autorizou."
     if draft.pending:
         full += "\n\nA conferir: " + " · ".join(draft.pending[:2])
     confirmation = ("Responda *PUBLICAR*, *REFAZER* ou *BUSCAR FOTO*. Você também pode enviar a foto nesta mensagem."
