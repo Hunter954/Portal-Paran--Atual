@@ -13,7 +13,7 @@ from .collector import next_run, run_collection, source_domain
 from .editorial import EditorialError, lock_story, publish_due, queue_draft, run_job
 from .migration import radar_cli
 from . import seeds  # Registra o comando radar seed.
-from .models import Alert, ChatDraftReply, CoverSearch, GroupDelivery, Job, Run, Story, now
+from .models import Alert, ChatDraftReply, CoverSearch, GroupDelivery, Job, ManualSearch, Run, Story, MANUAL_REGION, now
 from .wa_cover import run_cover_search
 from .wa_delivery import send_pending_draft_reply
 from .group_delivery import send_pending_group
@@ -42,6 +42,8 @@ def tick(domains):
     heartbeat()
     worker_paused = paused()
     send_pending_group(include_alerts=not worker_paused)
+    from .manual_search import run_manual_search
+    run_manual_search()
     if worker_paused:
         return
     publish_due()
@@ -64,6 +66,7 @@ def recover_interrupted(*, editorial=True):
         ChatDraftReply.query.filter_by(state="sending").update({"state": "failed"})
         Job.query.filter_by(state="running").update({"state": "pending"})
     CoverSearch.query.filter_by(state="sending").update({"state": "failed"})
+    ManualSearch.query.filter_by(state='running').update({'state':'pending'})
     GroupDelivery.query.filter_by(state="sending").update(
         {"state": "error", "message": "Entrega sem confirmação.", "finished": now()})
     Alert.query.filter_by(state="sending").update({"state": "error", "message": "Entrega sem confirmação.", "finished": now()})
@@ -72,7 +75,7 @@ def recover_interrupted(*, editorial=True):
 
 
 def prefetch_job():
-    latest = [story.id for story in Story.query.filter(
+    latest = [story.id for story in Story.query.filter(Story.region != MANUAL_REGION,
         Story.state.in_(("new", "research", "production", "review")),
         Story.created >= now() - timedelta(days=7), Story.articles.any(),
     ).order_by(Story.id.desc()).limit(4)]

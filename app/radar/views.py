@@ -55,13 +55,14 @@ def screen(template, **context):
 @bp.get("")
 @bp.get("/")
 def index():
+    from .models import MANUAL_REGION
     tab = request.args.get("tab", "new")
     term = request.args.get("q", "").strip()[:160]
     city = request.args.get("city", "").strip()[:150]
     region = request.args.get("region", "").strip()[:100]
     category = request.args.get("category", "").strip()[:100]
     source_id = request.args.get("source", type=int)
-    query = Story.query.options(selectinload(Story.articles).joinedload(Article.source))
+    query = Story.query.filter(Story.region != MANUAL_REGION).options(selectinload(Story.articles).joinedload(Article.source))
     if term:
         escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
@@ -90,14 +91,14 @@ def index():
     today = midnight.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
     return screen("index", nav="stories", tab=tab, stories=stories, term=term, city=city, region=region,
                   category=category, source_id=source_id,
-                  cities=[row[0] for row in db.session.query(Story.location).distinct().order_by(Story.location)],
-                  regions=[row[0] for row in db.session.query(Story.region).distinct().order_by(Story.region)],
-                  categories=[row[0] for row in db.session.query(Story.category).filter(Story.category != "")
+                  cities=[row[0] for row in db.session.query(Story.location).filter(Story.region != MANUAL_REGION).distinct().order_by(Story.location)],
+                  regions=[row[0] for row in db.session.query(Story.region).filter(Story.region != MANUAL_REGION).distinct().order_by(Story.region)],
+                  categories=[row[0] for row in db.session.query(Story.category).filter(Story.region != MANUAL_REGION,Story.category != "")
                               .distinct().order_by(Story.category)],
-                  sources=Source.query.order_by(Source.name).all(),
-                  today=Article.query.filter(Article.discovered >= today).count(),
-                  urgent=Story.query.filter(Story.score >= 75, Story.state.in_(("new", "research", "review"))).count(),
-                  pending=Story.query.filter_by(state="review").count(),
+                  sources=Source.query.filter_by(archived=False).order_by(Source.name).all(),
+                  today=Article.query.join(Story).filter(Story.region != MANUAL_REGION,Article.discovered >= today).count(),
+                  urgent=Story.query.filter(Story.region != MANUAL_REGION,Story.score >= 75, Story.state.in_(("new", "research", "review"))).count(),
+                  pending=Story.query.filter(Story.region != MANUAL_REGION,Story.state=="review").count(),
                   failures=Source.query.filter(Source.active.is_(True), Source.failures > 0).count())
 
 

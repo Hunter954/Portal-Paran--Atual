@@ -249,7 +249,7 @@ def test_whatsapp_rejects_unauthorized_and_duplicate_commands(portal, monkeypatc
     client = app.test_client()
     assert client.post(url, json=message).status_code == 401
     assert client.post(url, json={**message, "phone": "+5545000000011"}, headers=headers).status_code == 403
-    assert "RADAR URGENTES" in client.post(url, json=message, headers=headers).json["reply"]
+    assert "Urgentes do Paraná" in client.post(url, json=message, headers=headers).json["reply"]
     assert client.post(url, json=message, headers=headers).json["reply"] is None
     assert InboundMessage.query.count() == 1
 

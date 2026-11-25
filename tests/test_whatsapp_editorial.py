@@ -80,8 +80,8 @@ def test_menu_accepts_quantity_replays_cards_and_resumes_requested_pages(portal,
     seed(13)
     assert send("7").json["reply"] is None
     assert "PARANÁ ATUAL | REDAÇÃO" in send("menu").json["reply"]
-    assert "Quantas pautas" in send("9").json["reply"]
-    first = send("12").json
+    assert "Buscar notícia por assunto" in send("9").json["reply"]
+    first = send("RADAR LISTAR 12").json
     assert len(first["messages"]) == 10
     assert "Restam até 2" in first["reply"]
     later = send("MAIS").json
@@ -272,7 +272,7 @@ def test_editorial_interruption_keeps_sources_available_and_blocks_empty_publica
     draft = latest_draft(story.id)
     assert draft.body == "" and draft.facts
     preview = send(f"RADAR VER {story.id}").json["messages"][-1]
-    assert "Fontes da pauta" in preview["text"] and "Responda *TEXTO*" in preview["text"]
+    assert "Fontes da pauta" in preview["text"] and "*5* Editar texto ou foto" in preview["text"]
     assert "Envie o texto" in send("PUBLICAR", preview["id"]).json["reply"]
     edited = send("TEXTO A programação tem aulas gratuitas em Curitiba.", preview["id"]).json["messages"][-1]
     assert "foto da matéria ainda não está disponível" in send("PUBLICAR", edited["id"]).json["reply"]

@@ -38,7 +38,7 @@ A captura usa `PARANAATUAL_AD_REPORTS_URL` e `PARANAATUAL_AD_REPORTS_TOKEN`. Exe
 
 ## Radar na conversa do WhatsApp
 
-Digite MENU e escolha 9, ou use RADAR LISTAR 10. Cada pauta chega em uma mensagem pr?pria. Informe outra quantidade, use MAIS para continuar ou RADAR REENVIAR para repetir a consulta. RADAR URGENTES 10 filtra as pautas com pontua??o a partir de 75. Os alertas autom?ticos seguem o limite escolhido e a data de ativa??o, enquanto a listagem manual inclui o hist?rico aberto.
+Envie MENU e escolha 9. O submenu oferece 1 Pautas do Paraná, 2 Urgentes do Paraná, 3 Buscar notícia por assunto — Brasil e mundo, 4 Minhas buscas e 0 Menu principal. Escolha uma pauta pelo número, prepare a prévia e use as opções numeradas para publicar, refazer, conferir fontes ou editar texto e foto. As listas têm paginação. Os comandos antigos continuam disponíveis para quem já os utiliza.
 
 Responda POSTAR na mensagem da pauta para receber a prévia. O worker lê a reportagem completa e procura a foto creditada no artigo. A foto anexada à prévia é preservada na publicação, junto com o crédito cadastrado. O campo de licença permanece como metadado; quando estiver vazio, a foto não é descartada. Sem uma foto válida, a publicação aguarda a imagem e informa o editor. Na prévia responda PUBLICAR para confirmar ou REFAZER para gerar outro texto. TÍTULO, RESUMO e TEXTO continuam disponíveis para edições pontuais. A prévia e a capa são associadas à versão atual da pauta.
 
@@ -52,7 +52,7 @@ Use MENU, 2 e 1 para criar uma matéria normal. Envie primeiro o título e o tex
 
 Nas prévias do Radar e nas matérias com fonte cadastrada, BUSCAR FOTO consulta exclusivamente a reportagem vinculada. A foto original e seu crédito são anexados à versão atual da prévia e enviados ao WhatsApp. Não há busca por assunto, Google ou Wikimedia como alternativa para essas capas. Se a imagem não puder ser obtida, o bot avisa e mantém a prévia sem foto. Sugestões antigas sem vínculo com a reportagem não podem ser anexadas; imagens enviadas pela redação continuam disponíveis.
 
-O worker editorial prepara até quatro pautas recentes enquanto a fila está vazia e atende pedidos do WhatsApp primeiro. Texto e fotos seguem em filas independentes. Se a geração ficar incompleta, a conversa recebe as fontes e o comando TEXTO para concluir a prévia com revisão. A publicação continua vinculada à confirmação da versão.
+O worker editorial prepara até quatro pautas recentes enquanto a fila está vazia e atende pedidos do WhatsApp primeiro. Texto e fotos seguem em filas independentes. Se a geração ficar incompleta, a conversa recebe as fontes e a opção 5 para editar o texto e concluir a prévia com revisão. A publicação continua vinculada à confirmação da versão.
 
 
 ## Fotos originais — correção de 24/11/2026
@@ -63,3 +63,12 @@ Imagem do portal e do worker: `parana-atual-radar:original-article-photo-2026112
 ## Publicação preserva a foto — 24/11/2026
 
 Portal e worker usam `parana-atual-radar:publish-original-photo-20261124`. O Radar publica a mesma imagem da versão aprovada, com crédito e descrição, sem substituir o arquivo por uma logo quando o campo de licença está vazio. O CMS no WhatsApp também aguarda uma foto quando a matéria não tem imagem válida. Os 52 testes aprovados incluem o fluxo completo de extração, prévia, PUBLICAR, página pública, crédito, Open Graph e acesso anônimo aos mesmos bytes da foto.
+
+
+## Busca por assunto no WhatsApp — 24/11/2026
+
+O caminho MENU → 9 → 3 solicita apenas o assunto e oferece períodos de 7 dias, 30 dias ou sem limite de data. O worker consulta o RSS público do Bing Notícias, decodifica os links originais e mostra título, fonte e data de cada resultado. A consulta não vira uma alegação factual e as miniaturas do buscador são ignoradas. A foto continua vindo da reportagem selecionada pelo fluxo de fotos originais, com a mesma imagem na prévia e na publicação.
+
+Escolher um resultado exibe a reportagem; preparar a matéria é uma ação separada. O resultado importado usa a região interna Busca livre e uma fonte inativa e arquivada, sem ampliar o monitoramento, a fila automática, os alertas ou a preparação antecipada de pautas do Paraná. O histórico é limitado ao administrador e à conversa. Navegar para outro menu ou iniciar outra busca impede a entrega de resultados antigos naquela navegação.
+
+A migração aditiva cria radar_manual_searches. Portal e worker usam a imagem parana-atual-radar:search-menu-20261124. O gateway e os grupos existentes são preservados. As escolhas são numeradas em mensagens de texto, sem exigir que o editor memorize comandos. Somente o assunto pesquisado e os campos em edição são texto livre.

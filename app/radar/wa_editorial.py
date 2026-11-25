@@ -9,19 +9,12 @@ from sqlalchemy import select
 from ..models import Post, db
 from .editorial import PROMPT_VERSION, EditorialError, can_publish, latest_draft, lock_story, publish, queue_draft, save_draft
 from .geography import normalize
-from .models import ChatCard, ChatDraftReply, ChatSession, Draft, DraftMedia, Story, audit, now
+from .models import ChatCard, ChatDraftReply, ChatSession, Draft, DraftMedia, Story, MANUAL_REGION, audit, now
 
 
 OPEN_STATES = ("new", "research", "production", "review")
 PAGE_SIZE = 10
-HELP = (
-    "*Radar Paraná Atual*\n"
-    "Quantas pautas você quer receber? Digite um número, como *10*, ou *RADAR LISTAR 10*.\n"
-    "Use *MAIS* para continuar, *RADAR REENVIAR* para receber a lista novamente ou "
-    "*RADAR URGENTES 10* para filtrar.\n"
-    "Responda *POSTAR* numa pauta para receber a prévia. Na prévia, *PUBLICAR* coloca a matéria no ar "
-    "e *REFAZER* pede outro texto."
-)
+from .wa_radar_menu import HOME as HELP
 
 
 def chat_session(actor, group):
@@ -56,7 +49,7 @@ def story_card(story, actor, group):
     }.get(story.state, story.state)
     text = (f"*Pauta #{story.id} · {label}*\n{story.title}\n"
             f"{story.location} · {story.score}/100 · {article.source.name}\n"
-            f"{summary}\n\nResponda *POSTAR* para abrir a prévia.")
+            f"{summary}\n\n*1* Preparar prévia\n*2* Ver fontes\n*0* Menu do Radar")
     return reply_card(story, text, actor, group)
 
 
@@ -83,10 +76,12 @@ def draft_cards(story, draft, actor, group):
         full += "\nFoto: buscando na reportagem original."
     if draft.pending:
         full += "\n\nA conferir: " + " · ".join(draft.pending[:2])
-    confirmation = ("Responda *PUBLICAR*, *REFAZER* ou *BUSCAR FOTO*. Você também pode enviar a foto nesta mensagem."
-                    if draft.body.strip() else "Responda *TEXTO* seguido da matéria para concluir a prévia.")
+    from .wa_radar_menu import PREVIEW, remember_preview
+    confirmation = PREVIEW
     if len(full) + len(confirmation) + 2 <= 3100:
-        return [*images, reply_card(story, full + "\n\n" + confirmation, actor, group, draft)]
+        card = reply_card(story, full + "\n\n" + confirmation, actor, group, draft)
+        remember_preview(story,draft,actor,group,card['id'])
+        return [*images, card]
     chunks = []
     remaining = full
     while remaining:
@@ -95,13 +90,14 @@ def draft_cards(story, draft, actor, group):
         size = boundary if len(remaining) > 3000 and boundary > 1600 else len(candidate)
         chunks.append({"text": remaining[:size]})
         remaining = remaining[size:].lstrip()
-    return [*images, *chunks, reply_card(story, confirmation, actor, group, draft)]
+    card = reply_card(story,confirmation,actor,group,draft)
+    remember_preview(story,draft,actor,group,card['id'])
+    return [*images, *chunks, card]
 
 
 def open_radar(actor, group):
-    session = chat_session(actor, group)
-    session.mode = "radar"
-    return HELP
+    from .wa_radar_menu import enter,state_for
+    return enter(state_for(actor,group),actor,group)
 
 
 def list_stories(actor, group, count=None, *, urgent=False, more=False):
@@ -112,7 +108,7 @@ def list_stories(actor, group, count=None, *, urgent=False, more=False):
         session.before_id, session.urgent = None, urgent
     if not session.remaining:
         return "A lista terminou. Digite *RADAR LISTAR 10* ou escolha outra quantidade."
-    query = Story.query.filter(Story.state.in_(OPEN_STATES), Story.articles.any())
+    query = Story.query.filter(Story.region != MANUAL_REGION, Story.state.in_(OPEN_STATES), Story.articles.any())
     if session.urgent:
         query = query.filter(Story.score >= 75)
     if session.before_id:
@@ -169,7 +165,7 @@ def confirm_story(story, version, actor, group=None):
     latest = latest_draft(story.id)
     if not latest or latest.version != version or story.state != "review":
         raise EditorialError("Essa prévia mudou ou saiu da fila de revisão. Responda *VER* para receber a versão atual.")
-    if not any(article.evidence for article in story.articles):
+    if story.region != MANUAL_REGION and not any(article.evidence for article in story.articles):
         raise EditorialError("A pauta precisa de uma fonte com o vínculo documentado com o Paraná.")
     if legacy_draft(latest):
         return request_draft(story, actor, group, fresh=True)
@@ -223,8 +219,8 @@ def save_cover_from_message(card, actor, group, text, image):
     return {"messages": draft_cards(require_draft, saved, actor, group)}
 
 def radar_status():
-    total = Story.query.filter(Story.state.in_(OPEN_STATES)).count()
-    urgent = Story.query.filter(Story.state.in_(OPEN_STATES), Story.score >= 75).count()
+    total = Story.query.filter(Story.region != MANUAL_REGION,Story.state.in_(OPEN_STATES)).count()
+    urgent = Story.query.filter(Story.region != MANUAL_REGION,Story.state.in_(OPEN_STATES), Story.score >= 75).count()
     from .group_delivery import group_settings
     try:
         settings = group_settings()

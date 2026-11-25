@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ..models import User, db
 from .editorial import EditorialError
-from .models import Alert, ChatCard, InboundMessage, Story, WhatsAppPreference, audit, now
+from .models import Alert, ChatCard, InboundMessage, Story, SiteChat, MANUAL_REGION, WhatsAppPreference, audit, now
 
 
 bp = Blueprint("radar_gateway", __name__, url_prefix="/internal/radar/whatsapp")
@@ -72,7 +72,7 @@ def send_pending_alert():
             continue
         if Alert.query.filter(Alert.user_id == user.id, Alert.created > now() - timedelta(hours=1)).count() >= 5:
             continue
-        story = Story.query.filter(
+        story = Story.query.filter(Story.region != MANUAL_REGION,
             Story.created >= max(preference.subscribed, now() - timedelta(hours=12)),
             Story.score >= preference.minimum,
             Story.state.in_(("new", "research", "production", "review")),
@@ -84,7 +84,7 @@ def send_pending_alert():
         text = (f"RADAR PARANÁ ATUAL · #{story.id}\n"
                 f"{story.title}\n{story.location} · Relevância {story.score}/100\n"
                 f"{first.summary[:350]}\n{first.url}\n"
-                f"Responda POSTAR nesta mensagem ou RADAR FONTES {story.id}.")
+                f"\n*1* Preparar prévia\n*2* Ver fontes\n*0* Menu do Radar")
         message_key = "3EB0" + hashlib.sha256(f"parana-atual:radar:{story.id}:{user.id}".encode()).hexdigest()[:18].upper()
         alert = Alert(story_id=story.id, user_id=user.id, state="sending")
         db.session.add(alert)
@@ -173,5 +173,9 @@ def receive():
         reply = group_menu(message, user.id, group_id, quote_id, image)
     except EditorialError as exc:
         reply = str(exc)
+        state=db.session.get(SiteChat,(user.id,group_id or ''))
+        if state and state.data.get('radar_ui'):
+            from .wa_radar_menu import current_options
+            reply+='\n\n'+current_options(state)
     db.session.commit()
     return jsonify(reply) if isinstance(reply, dict) else jsonify(reply=reply)

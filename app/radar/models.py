@@ -2,6 +2,8 @@ from datetime import UTC, datetime
 
 from ..models import db
 
+MANUAL_REGION = "Busca livre"
+
 
 def now():
     return datetime.now(UTC).replace(tzinfo=None)
@@ -251,6 +253,20 @@ class CoverSearch(db.Model):
     target = db.Column(db.JSON, nullable=False)
     created = db.Column(db.DateTime, nullable=False, default=now)
     state = db.Column(db.String(12), nullable=False, index=True, default="pending")
+
+
+class ManualSearch(db.Model):
+    __tablename__ = "radar_manual_searches"
+    id = db.Column(db.Integer, primary_key=True)
+    actor_id = db.Column(db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True)
+    scope = db.Column(db.String(40), nullable=False, default="")
+    term = db.Column(db.String(220), nullable=False)
+    days = db.Column(db.Integer, nullable=False, default=7)
+    state = db.Column(db.String(12), nullable=False, default="pending", index=True)
+    results = db.Column(db.JSON, nullable=False, default=list)
+    error = db.Column(db.String(300))
+    created = db.Column(db.DateTime, nullable=False, default=now)
+    finished = db.Column(db.DateTime)
 
 
 def audit(action, *, actor=None, story=None, source=None, details=None):

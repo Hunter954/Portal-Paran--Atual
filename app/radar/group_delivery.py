@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ..models import Post, db
 from .editorial import EditorialError
-from .models import ChatCard, GroupDelivery, Story, now
+from .models import ChatCard, GroupDelivery, Story, MANUAL_REGION, now
 from .whatsapp import enabled, gateway
 
 
@@ -46,7 +46,7 @@ def next_subject(config, kind):
         query = Post.query.filter(Post.source.in_(("local", "radar")))
     else:
         table, field, start = Story, Story.created, config["alerts_since"]
-        query = Story.query.filter(Story.score >= config["minimum"],
+        query = Story.query.filter(Story.region != MANUAL_REGION,Story.score >= config["minimum"],
                                    Story.state.in_(("new", "research", "production", "review")))
     if not start:
         return None
@@ -61,7 +61,7 @@ def message_for(subject, kind):
         return (f"🚨 *Radar Paraná Atual · #{subject.id}*\n{subject.title}\n"
                 f"{subject.location} · Relevância {subject.score}/100\n"
                 f"{first.summary[:350]}\n{first.url}\n"
-                f"Responda POSTAR nesta mensagem ou digite RADAR FONTES {subject.id}.")
+                f"\n*1* Preparar prévia\n*2* Ver fontes\n*0* Menu do Radar")
     summary = BeautifulSoup(subject.excerpt or subject.content_html or "", "html.parser").get_text(" ", strip=True)
     return (f"📰 *Nova matéria no Paraná Atual*\n\n{subject.title}\n\n"
             f"{summary[:400]}\n{post_url(subject)}")

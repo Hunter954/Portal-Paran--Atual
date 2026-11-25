@@ -12,7 +12,7 @@ from ..models import db
 from .feeds import get_feed
 from .fetch import FetchError, PublicFetcher
 from .geography import classify, normalize
-from .models import Article, Run, Source, Story, audit, now
+from .models import Article, Run, Source, Story, MANUAL_REGION, audit, now
 
 
 URGENT = re.compile(
@@ -67,7 +67,7 @@ def store_item(source, item, location):
     if Article.query.filter_by(url=item.url).first():
         return False
     fingerprint = sha256(normalize(item.title + "\n" + item.summary).encode()).hexdigest()
-    recent = Story.query.filter(Story.location == location.name, Story.created > now() - timedelta(days=3))
+    recent = Story.query.filter(Story.region != MANUAL_REGION,Story.location == location.name, Story.created > now() - timedelta(days=3))
     same = recent.join(Article).filter(Article.digest == fingerprint).first()
     if same is None:
         matches = recent.order_by(Story.id.desc()).limit(100)

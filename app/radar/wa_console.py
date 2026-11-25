@@ -94,6 +94,12 @@ def accepts_image(actor, group, quote_id):
     if (post and post.kind == "post") or (draft and draft.version is not None):
         return True
     state = db.session.get(SiteChat, (actor, group or ""))
+    if state and state.step == 'radar_photo' and state.updated >= now() - timedelta(minutes=35):
+        card = quoted_card(state.data.get('quote_id'), actor, group)
+        if card and card.version is not None:
+            from .editorial import latest_draft
+            draft = latest_draft(card.story_id)
+            return bool(draft and draft.version == card.version)
     return bool(state and state.updated >= now() - timedelta(minutes=35) and state.step == "input"
                 and state.data.get("action") == "upload")
 
@@ -106,6 +112,10 @@ def group_menu(text, actor, group, quote_id=None, image=None):
     if plain == "sair":
         set_step(state, "idle")
         return "Menu encerrado. Digite *MENU* para abrir a redação."
+    from .wa_radar_menu import handle
+    result = handle(state, text, actor, group, quote_id, image)
+    if result is not None:
+        return result
     if plain == "voltar":
         area = state.data.get("area") if state.step == "input" else "main"
         set_step(state, area or "main")
@@ -162,6 +172,9 @@ def group_menu(text, actor, group, quote_id=None, image=None):
         "postar", "ver", "fontes", "gerar", "confirmar", "apurar", "descartar", "apurado"
     }:
         return radar_command(text, actor, group)
+    if state.data.get('radar_ui'):
+        from .wa_radar_menu import current_options
+        return 'Escolha uma das opções exibidas.\n\n' + current_options(state)
     return None
 
 
