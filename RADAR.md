@@ -50,6 +50,11 @@ Use RADAR FONTES para listar o cat?logo, RADAR FONTE ADICIONAR nome | URL | tipo
 
 Use MENU, 2 e 1 para criar uma matéria normal. Envie primeiro o título e o texto na mesma mensagem, separados por uma linha em branco, ou em duas mensagens. A prévia aceita PUBLICAR, AGENDAR, edição por campo, BUSCAR FOTO e o envio de uma imagem como resposta. Categorias, usuários, publicidade, SEO, métricas e biblioteca ficam no menu principal.
 
-O Radar busca imagens pelo assunto depois de enviar uma nova prévia. Também é possível pedir BUSCAR FOTO com um assunto mais específico. Configure a variável `RADAR_GOOGLE_IMAGES_KEY` no worker para consultar o Google Imagens via SerpApi. Sem essa configuração, o worker consulta o Wikimedia Commons e preserva os créditos e a licença. Para anexar uma opção, responda USAR FOTO.
+Nas prévias do Radar e nas matérias com fonte cadastrada, BUSCAR FOTO consulta exclusivamente a reportagem vinculada. A foto original e seu crédito são anexados à versão atual da prévia e enviados ao WhatsApp. Não há busca por assunto, Google ou Wikimedia como alternativa para essas capas. Se a imagem não puder ser obtida, o bot avisa e mantém a prévia sem foto. Sugestões antigas sem vínculo com a reportagem não podem ser anexadas; imagens enviadas pela redação continuam disponíveis.
 
 O worker editorial prepara até quatro pautas recentes enquanto a fila está vazia e atende pedidos do WhatsApp primeiro. Texto e fotos seguem em filas independentes. Se a geração ficar incompleta, a conversa recebe as fontes e o comando TEXTO para concluir a prévia com revisão. A publicação continua vinculada à confirmação da versão.
+
+
+## Fotos originais — correção de 24/11/2026
+
+Imagem do portal e do worker: `parana-atual-radar:original-article-photo-20261124`. A prévia #98 foi usada para conferir a extração da foto creditada a Bruno Fernandes na reportagem original do g1. A foto foi verificada por SHA-256, sem alterações nos pixels. Os 49 testes do portal e do Radar passaram, incluindo falha de extração, isolamento de versões, bloqueio de cartões antigos e envio da foto no fluxo de prévia. A busca genérica continua restrita à consulta explícita de imagens na biblioteca, sem vincular seus resultados às matérias.
