@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import timedelta
 from threading import Event, Thread
 from time import monotonic, sleep
@@ -114,7 +115,7 @@ def editorial_loop(app, stop):
     while not stop.is_set():
         with app.app_context():
             try:
-                if editorial_step():
+                if editorial_step(prefetch=os.getenv("RADAR_PREFETCH", "0") == "1"):
                     continue
             except Exception as exc:
                 db.session.rollback()

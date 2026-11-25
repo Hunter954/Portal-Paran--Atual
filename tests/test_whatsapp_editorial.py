@@ -1,4 +1,5 @@
 import json
+import pytest
 from datetime import timedelta
 from unittest.mock import Mock
 
@@ -29,10 +30,9 @@ def test_model_draft_uses_source_heading_when_a_field_is_cut_off(monkeypatch):
               "texto": ("Uma colisão com um caminhão matou um condutor no oeste do Paraná. "
                         "O acidente mobilizou socorristas e policiais. A apuração busca identificar como o "
                         "acidente aconteceu e as condições de circulação na rodovia.")}
-    result = generate([source])
-    assert result["titulo"] == source["titulo"]
-    assert not result["resumo"]
-    assert result["corpo"] == data["p"][0]
+    from app.radar.editorial import EditorialError
+    with pytest.raises(EditorialError, match="curta|incompleto"):
+        generate([source])
 
 
 def provision(portal, monkeypatch):

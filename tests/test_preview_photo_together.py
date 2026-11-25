@@ -87,7 +87,9 @@ def test_generation_preserves_editorial_schema_uses_four_threads_and_stays_warm(
     monkeypatch.setenv('RADAR_OLLAMA_URL','http://local.test')
     payloads=[]
     paragraphs=['A celebração religiosa foi anunciada pelo sacerdote por meio de suas redes sociais. O encontro acontecerá diante da unidade de saúde onde o ex-presidente recebe atendimento médico.',
-                'Segundo a reportagem, o religioso divulgou os detalhes da programação e pediu a participação dos fiéis. As informações foram publicadas nesta terça-feira.']
+                'Segundo a reportagem, o religioso divulgou os detalhes da programação e pediu a participação dos fiéis. As informações foram publicadas nesta terça-feira.',
+                'A publicação informa o local onde os participantes deverão se reunir. O convite foi feito pelo sacerdote em uma mensagem dirigida aos apoiadores.',
+                'O atendimento ao ex-presidente continua sob responsabilidade da equipe médica. A notícia apresenta as informações conhecidas sobre a programação e a internação.']
     def response(*a,**kw):
         payloads.append(kw['json']);return SimpleNamespace(status_code=200,json=lambda:{'message':{'content':__import__('json').dumps({'t':'Padre anuncia missa em frente a hospital','s':'Celebração religiosa foi anunciada nas redes.','p':paragraphs})}})
     monkeypatch.setattr('app.radar.editorial.requests.Session.post',response)

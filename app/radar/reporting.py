@@ -41,8 +41,11 @@ def article_paragraphs(page, schema):
         paragraphs = []
         for node in page.select(selector):
             text = clean(node.get_text(" ", strip=True))
-            if re.match(r"^(leia também|veja também|vídeos:|mais notícias)", text, re.I):
-                break
+            if re.match(r"^(leia também|veja também|leia mais|vídeos:|mais notícias)", text, re.I):
+                continue
+            linked = sum(len(clean(link.get_text(" ", strip=True))) for link in node.find_all("a"))
+            if linked > len(text) * 0.75 or re.search(r"\bleia mais:", text, re.I):
+                continue
             if len(text) < 50 or re.search(r"siga (o|a) (canal|página)|inscreva-se", text, re.I):
                 continue
             if text not in paragraphs:
@@ -171,7 +174,7 @@ def report_sources(sources, *, include_photo=True, photo_executor=None):
         schema = structured_data(page)
         paragraphs = article_paragraphs(page, schema)
         if paragraphs:
-            source["texto"] = "\n".join(paragraphs)[:(3300 if index == 0 else 1500)]
+            source["texto"] = "\n".join(paragraphs)[:(16000 if index == 0 else 8000)]
             date = page.find("meta", attrs={"property": "article:published_time"})
             source["publicado"] = schema.get("datePublished") or (date.get("content") if date else None) or source.get("publicado")
         if include_photo and index == 0:

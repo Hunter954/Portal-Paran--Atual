@@ -55,50 +55,63 @@ def story_card(story, actor, group):
 
 def draft_cards(story, draft, actor, group):
     from .group_delivery import PUBLIC_URL
-    photo = db.session.get(DraftMedia, draft.id)
     from .wa_cover import generic_photo
+    from .wa_radar_menu import PREVIEW, remember_preview
+    photo = db.session.get(DraftMedia, draft.id)
     if photo and generic_photo(photo):
         photo = None
-    images = [{"text": f"Foto: {photo.credit}" + (f"\n{photo.description}" if photo.description else ""),
-               "cover": PUBLIC_URL + photo.path}] if photo else []
     source = story.articles[0]
+    credit = (f"Foto: {photo.credit}" + (f"\n{photo.description}" if photo.description else "")) if photo else ""
+    body = re.sub(r"^## (.+)$", r"*\1*", draft.body, flags=re.M)
     if draft.body.strip():
-        full = (f"*Prévia · #{story.id}*\n\n*{draft.title}*\n"
-                f"{draft.excerpt}\n\n{draft.body}\n\nFonte: {source.url}")
+        header = f"*Prévia · #{story.id}*\n\n*{draft.title}*\n{draft.excerpt}"
+        if credit:
+            header += "\n\n" + credit
+        full = header + f"\n\n{body}\n\nFonte: {source.url}"
+        if not photo:
+            full += "\nFoto original indisponível. Use 5 → 4 para enviar a foto ou 3 para tentar buscá-la novamente."
     else:
         full = f"*Fontes da pauta #{story.id}*\n\n*{draft.title}*\nFonte: {source.url}"
         first_fact = draft.facts[0].get("texto", "") if draft.facts else ""
         words = first_fact.split()
         if words:
-            snippet = " ".join(words[:24])
-            full += "\n\nTrecho da fonte\n" + snippet + ("…" if len(words) > 24 else "")
-    if photo:
-        full += f"\n\nFoto: {photo.credit}"
-        if photo.description:
-            full += '\n' + photo.description
-    elif draft.body.strip():
-        full += "\nFoto original indisponível. Use 5 → 4 para enviar a foto ou 3 para tentar buscá-la novamente."
+            full += "\n\nTrecho da fonte\n" + " ".join(words[:24]) + ("…" if len(words) > 24 else "")
+        if credit:
+            full += "\n\n" + credit
     if draft.pending:
         full += "\n\nA conferir: " + " · ".join(draft.pending[:2])
-    from .wa_radar_menu import PREVIEW, remember_preview
-    confirmation = PREVIEW
-    if len(full) + len(confirmation) + 2 <= 3100:
-        card = reply_card(story, full + "\n\n" + confirmation, actor, group, draft)
+    if len(full) + len(PREVIEW) + 2 <= 3100:
+        card = reply_card(story, full + "\n\n" + PREVIEW, actor, group, draft)
         if photo:
-            card['cover'] = PUBLIC_URL + photo.path
-        remember_preview(story,draft,actor,group,card['id'])
+            card["cover"] = PUBLIC_URL + photo.path
+        remember_preview(story, draft, actor, group, card["id"])
         return [card]
-    chunks = []
+    pieces = []
     remaining = full
     while remaining:
-        candidate = remaining[:3000]
-        boundary = candidate.rfind("\n")
-        size = boundary if len(remaining) > 3000 and boundary > 1600 else len(candidate)
-        chunks.append({"text": remaining[:size]})
+        if len(remaining) <= 2800:
+            pieces.append(remaining)
+            break
+        boundary = remaining.rfind("\n", 0, 2800)
+        if boundary < 1400:
+            boundary = remaining.rfind(" ", 0, 2800)
+        size = boundary if boundary > 0 else 2800
+        pieces.append(remaining[:size])
         remaining = remaining[size:].lstrip()
-    card = reply_card(story,confirmation,actor,group,draft)
-    remember_preview(story,draft,actor,group,card['id'])
-    return [*images, *chunks, card]
+    messages = []
+    for index, piece in enumerate(pieces):
+        prefix = f"*Parte {index + 1}/{len(pieces)}*\n\n"
+        text = prefix + piece
+        if index == len(pieces) - 1 and len(text) + len(PREVIEW) + 2 <= 3100:
+            text += "\n\n" + PREVIEW
+        card = reply_card(story, text, actor, group, draft)
+        if index == 0 and photo:
+            card["cover"] = PUBLIC_URL + photo.path
+        messages.append(card)
+    if PREVIEW not in messages[-1]["text"]:
+        messages.append(reply_card(story, PREVIEW, actor, group, draft))
+    remember_preview(story, draft, actor, group, messages[-1]["id"])
+    return messages
 
 
 def open_radar(actor, group):
@@ -146,7 +159,7 @@ def quoted_card(quote_id, actor, group):
 def legacy_draft(draft):
     origin = Draft.query.filter(Draft.story_id == draft.story_id, Draft.version <= draft.version,
                                 Draft.model.isnot(None)).order_by(Draft.version.desc()).first()
-    return bool(origin and not origin.model.endswith((":radar-pt-br-v3", ":" + PROMPT_VERSION)))
+    return bool(origin and not origin.model.endswith(":" + PROMPT_VERSION) and len(draft.body.split()) < 180)
 
 
 def request_draft(story, actor, group, *, fresh=False):
